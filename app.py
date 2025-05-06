@@ -1,5 +1,7 @@
 import streamlit as st
 import pandas as pd
+import plotly.express as px
+
 
 # Load data
 @st.cache_data
@@ -87,3 +89,47 @@ with st.expander("💸 Cash Out Categories"):
                 st.markdown(f"- *No data for {label}*")
         except Exception as e:
             st.error(f"Error displaying category '{label}': {e}")
+
+import plotly.express as px
+
+# --- Charts for Other Financial Values ---
+
+st.subheader("📊 Other Relevant Financial Visuals")
+
+# Define chart options
+chart_options = {
+    "Fixed Deposits - Open": "Fixed Deposits - Open",
+    "Fixed Deposits - Under Lien": "Fixed Deposits - Under Lien",
+    "Debentures": "Debentures",
+    "Bank (Closing Balance)": "Bank",
+    "Cash in Hand (Closing Balance)": "Cash in Hand"
+}
+
+selected_chart = st.selectbox("Select a metric to visualize:", list(chart_options.keys()))
+selected_category = chart_options[selected_chart]
+
+# Get data row for selected category
+category_row = df[df["Category"] == selected_category]
+
+if not category_row.empty:
+    # Prepare data for chart
+    row = category_row.iloc[0][currency_columns]
+    chart_df = pd.DataFrame({
+        "Currency": row.index,
+        "Amount": row.values
+    }).dropna()
+
+    # Draw bar chart
+    fig = px.bar(
+        chart_df,
+        x="Amount",
+        y="Currency",
+        orientation='h',
+        title=f"{selected_chart} by Currency",
+        text="Amount"
+    )
+    fig.update_layout(yaxis={'categoryorder':'total ascending'})
+    st.plotly_chart(fig)
+else:
+    st.warning(f"No data available for '{selected_chart}'")
+
