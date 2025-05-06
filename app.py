@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
 
 # Load data
 @st.cache_data
@@ -37,17 +36,17 @@ for cat in ["Bank", "Cash in Hand"]:
         st.dataframe(row[selected_currencies].T.rename(columns={row.index[0]: 'Amount'}))
 
 # --- Cash In / Out Summary ---
-st.subheader("📥 Cash In")
+st.subheader("📥 Cash In (Weekly Total)")
 cash_in = week_data[week_data["Category"] == "Cash Ins"]
 if not cash_in.empty:
     st.dataframe(cash_in[selected_currencies].T.rename(columns={cash_in.index[0]: 'Amount'}))
 
-st.subheader("📤 Cash Out")
+st.subheader("📤 Cash Out (Weekly Total)")
 cash_out = week_data[week_data["Category"] == "Cash Outs"]
 if not cash_out.empty:
     st.dataframe(cash_out[selected_currencies].T.rename(columns={cash_out.index[0]: 'Amount'}))
 
-# --- Transaction Categories ---
+# --- Expandable Category Details ---
 cash_in_categories = [
     'Customer Payments', 'Investor Funding', 'Loan Proceeds', 'Intercompany Transfers In',
     'Interest Received', 'Sale of Assets', 'Forex Gains', 'Grants/Subsidies', 'Other Income'
@@ -59,24 +58,24 @@ cash_out_categories = [
     'Marketing & Advertising', 'Miscellaneous Expenses'
 ]
 
-cash_in_data = df[df["Category"].isin(cash_in_categories)].copy()
-cash_out_data = df[df["Category"].isin(cash_out_categories)].copy()
+st.subheader("🔻 Detailed Transactions")
 
-# --- Charts Section ---
-st.subheader("📈 Charts & Analysis")
+# Cash In Dropdowns
+with st.expander("💰 Cash In Breakdown"):
+    for category in cash_in_categories:
+        cat_data = df[df["Category"] == category]
+        if not cat_data.empty:
+            with st.expander(f"🔹 {category}"):
+                st.dataframe(cat_data[selected_currencies].T.rename(columns={cat_data.index[0]: 'Amount'}))
+        else:
+            st.write(f"*No data for {category}*")
 
-# Cash In Pie Chart (LKR)
-if not cash_in_data.empty and "LKR" in cash_in_data.columns:
-    cash_in_data_lkr = cash_in_data[["Category", "LKR"]].dropna()
-    fig_in = px.pie(cash_in_data_lkr, names="Category", values="LKR", title="Cash In Breakdown (LKR)")
-    st.plotly_chart(fig_in)
-
-# Cash Out Pie Chart (LKR)
-if not cash_out_data.empty and "LKR" in cash_out_data.columns:
-    cash_out_data_lkr = cash_out_data[["Category", "LKR"]].dropna()
-    fig_out = px.pie(cash_out_data_lkr, names="Category", values="LKR", title="Cash Out Breakdown (LKR)")
-    st.plotly_chart(fig_out)
-
-# Footer Note
-if cash_in_data["LKR"].isna().all() and cash_out_data["LKR"].isna().all():
-    st.info("ℹ️ Charts not shown because Cash In/Out category values are missing or not in LKR.")
+# Cash Out Dropdowns
+with st.expander("💸 Cash Out Breakdown"):
+    for category in cash_out_categories:
+        cat_data = df[df["Category"] == category]
+        if not cat_data.empty:
+            with st.expander(f"🔻 {category}"):
+                st.dataframe(cat_data[selected_currencies].T.rename(columns={cat_data.index[0]: 'Amount'}))
+        else:
+            st.write(f"*No data for {category}*")
