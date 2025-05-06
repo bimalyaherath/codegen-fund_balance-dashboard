@@ -91,45 +91,71 @@ with st.expander("💸 Cash Out Categories"):
             st.error(f"Error displaying category '{label}': {e}")
 
 import plotly.express as px
+import plotly.graph_objects as go
 
 # --- Charts for Other Financial Values ---
 
 st.subheader("📊 Other Relevant Financial Visuals")
 
-# Define chart options
+# Define chart options and types
 chart_options = {
-    "Fixed Deposits - Open": "Fixed Deposits - Open",
-    "Fixed Deposits - Under Lien": "Fixed Deposits - Under Lien",
-    "Debentures": "Debentures",
-    "Bank (Closing Balance)": "Bank",
-    "Cash in Hand (Closing Balance)": "Cash in Hand"
+    "Fixed Deposits - Open": "bar",
+    "Fixed Deposits - Under Lien": "line",
+    "Debentures": "treemap",
+    "Bank (Closing Balance)": "funnel",
+    "Cash in Hand (Closing Balance)": "pie"
 }
 
 selected_chart = st.selectbox("Select a metric to visualize:", list(chart_options.keys()))
-selected_category = chart_options[selected_chart]
+selected_category = selected_chart
+chart_type = chart_options[selected_chart]
 
 # Get data row for selected category
 category_row = df[df["Category"] == selected_category]
 
 if not category_row.empty:
-    # Prepare data for chart
     row = category_row.iloc[0][currency_columns]
     chart_df = pd.DataFrame({
         "Currency": row.index,
         "Amount": row.values
     }).dropna()
 
-    # Draw bar chart
-    fig = px.bar(
-        chart_df,
-        x="Amount",
-        y="Currency",
-        orientation='h',
-        title=f"{selected_chart} by Currency",
-        text="Amount"
-    )
-    fig.update_layout(yaxis={'categoryorder':'total ascending'})
+    # Draw appropriate chart
+    if chart_type == "bar":
+        fig = px.bar(
+            chart_df, x="Currency", y="Amount", text="Amount",
+            title=f"{selected_category} by Currency", color="Currency"
+        )
+
+    elif chart_type == "line":
+        fig = px.line(
+            chart_df, x="Currency", y="Amount", markers=True,
+            title=f"{selected_category} Trend Across Currencies"
+        )
+
+    elif chart_type == "treemap":
+        fig = px.treemap(
+            chart_df, path=["Currency"], values="Amount",
+            title=f"{selected_category} Distribution Treemap"
+        )
+
+    elif chart_type == "funnel":
+        fig = px.funnel(
+            chart_df, x="Amount", y="Currency",
+            title=f"{selected_category} - Liquidity Funnel"
+        )
+
+    elif chart_type == "pie":
+        fig = px.pie(
+            chart_df, names="Currency", values="Amount",
+            title=f"{selected_category} Cash Distribution",
+            hole=0.4
+        )
+
+    else:
+        fig = go.Figure()
+
     st.plotly_chart(fig)
+
 else:
     st.warning(f"No data available for '{selected_chart}'")
-
