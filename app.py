@@ -60,32 +60,28 @@ cash_out_categories = [
 
 st.subheader("🔻 Detailed Transactions")
 
-# Cash In Dropdowns
-with st.expander("💰 Cash In Breakdown"):
-    for category in cash_in_categories:
-        try:
-            label = str(category) if category is not None and not pd.isna(category) else "Unnamed Category"
-            label = label.strip() if isinstance(label, str) else "Unnamed Category"
-            cat_data = df[df["Category"] == category]
-            if not cat_data.empty:
-                with st.expander(f"🔹 {label}"):
-                    st.dataframe(cat_data[selected_currencies].T.rename(columns={cat_data.index[0]: 'Amount'}))
-            else:
-                st.markdown(f"- *No data for {label}*")
-        except Exception as e:
-            st.error(f"Error displaying category '{category}': {e}")
+st.subheader("💰 Cash In Categories")
+for category in cash_in_categories:
+    try:
+        label = str(category).strip() if category else "Unnamed Category"
+        cat_data = df[df["Category"] == category]
+        if not cat_data.empty:
+            with st.expander(f"🔹 {label}"):
+                st.dataframe(cat_data[selected_currencies].T.rename(columns={cat_data.index[0]: 'Amount'}))
+        else:
+            st.info(f"No data for {label}")
+    except Exception as e:
+        st.error(f"Error displaying category '{category}': {e}")
 
-# Cash Out Dropdowns
-with st.expander("💸 Cash Out Breakdown"):
-    for category in cash_out_categories:
-        try:
-            label = str(category) if category is not None and not pd.isna(category) else "Unnamed Category"
-            label = label.strip() if isinstance(label, str) else "Unnamed Category"
-            cat_data = df[df["Category"] == category]
-            if not cat_data.empty:
-                with st.expander(f"🔻 {label}"):
-                    st.dataframe(cat_data[selected_currencies].T.rename(columns={cat_data.index[0]: 'Amount'}))
-            else:
-                st.markdown(f"- *No data for {label}*")
-        except Exception as e:
-            st.error(f"Error displaying category '{category}': {e}")
+st.subheader("💸 Cash Out Categories")
+for category in cash_out_categories:
+    try:
+        label = str(category).strip() if category else "Unnamed Category"
+        cat_data = df[df["Category"] == category]
+        if not cat_data.empty:
+            with st.expander(f"🔻 {label}"):
+                st.dataframe(cat_data[selected_currencies].T.rename(columns={cat_data.index[0]: 'Amount'}))
+        else:
+            st.info(f"No data for {label}")
+    except Exception as e:
+        st.error(f"Error displaying category '{category}': {e}")
