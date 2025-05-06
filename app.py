@@ -60,28 +60,30 @@ cash_out_categories = [
 
 st.subheader("🔻 Detailed Transactions")
 
-st.subheader("💰 Cash In Categories")
-for category in cash_in_categories:
-    try:
-        label = str(category).strip() if category else "Unnamed Category"
-        cat_data = df[df["Category"] == category]
-        if not cat_data.empty:
-            with st.expander(f"🔹 {label}"):
+# Cash In: one dropdown, with all categories shown inside
+with st.expander("💰 Cash In Categories"):
+    for category in cash_in_categories:
+        try:
+            label = str(category).strip() if category else "Unnamed Category"
+            cat_data = df[df["Category"] == category]
+            if not cat_data.empty:
+                st.markdown(f"**🔹 {label}**")
                 st.dataframe(cat_data[selected_currencies].T.rename(columns={cat_data.index[0]: 'Amount'}))
-        else:
-            st.info(f"No data for {label}")
-    except Exception as e:
-        st.error(f"Error displaying category '{category}': {e}")
+            else:
+                st.markdown(f"- *No data for {label}*")
+        except Exception as e:
+            st.error(f"Error displaying category '{label}': {e}")
 
-st.subheader("💸 Cash Out Categories")
-for category in cash_out_categories:
-    try:
-        label = str(category).strip() if category else "Unnamed Category"
-        cat_data = df[df["Category"] == category]
-        if not cat_data.empty:
-            with st.expander(f"🔻 {label}"):
+# Cash Out: one dropdown, with all categories shown inside
+with st.expander("💸 Cash Out Categories"):
+    for category in cash_out_categories:
+        try:
+            label = str(category).strip() if category else "Unnamed Category"
+            cat_data = df[df["Category"] == category]
+            if not cat_data.empty:
+                st.markdown(f"**🔻 {label}**")
                 st.dataframe(cat_data[selected_currencies].T.rename(columns={cat_data.index[0]: 'Amount'}))
-        else:
-            st.info(f"No data for {label}")
-    except Exception as e:
-        st.error(f"Error displaying category '{category}': {e}")
+            else:
+                st.markdown(f"- *No data for {label}*")
+        except Exception as e:
+            st.error(f"Error displaying category '{label}': {e}")
