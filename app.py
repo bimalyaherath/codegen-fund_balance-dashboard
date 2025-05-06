@@ -31,60 +31,59 @@ week_data = df.loc[week_index:next_week_index - 1] if not pd.isna(next_week_inde
 
 import io
 
-st.subheader("📌 Weekly Summary")
+with st.expander("📌 Weekly Summary"):
+    # Pull relevant rows
+    def get_row(label):
+        row = week_data[week_data["Category"] == label]
+        return row[selected_currencies].iloc[0] if not row.empty else pd.Series([0]*len(selected_currencies), index=selected_currencies)
 
-# Pull relevant rows
-def get_row(label):
-    row = week_data[week_data["Category"] == label]
-    return row[selected_currencies].iloc[0] if not row.empty else pd.Series([0]*len(selected_currencies), index=selected_currencies)
+    # Opening & closing balances
+    opening_bank = get_row("Bank")
+    opening_cash = get_row("Cash in Hand")
 
-# Opening & closing balances
-opening_bank = get_row("Bank")
-opening_cash = get_row("Cash in Hand")
-closing_index = df[df["Category"].str.contains("Bank & Cash Balances")].index
-if len(closing_index) >= 2:
-    closing_data = df.loc[closing_index[1]:]
-    closing_bank = closing_data[closing_data["Category"] == "Bank"]
-    closing_cash = closing_data[closing_data["Category"] == "Cash in Hand"]
-    closing_bank = closing_bank[selected_currencies].iloc[0] if not closing_bank.empty else pd.Series([0]*len(selected_currencies), index=selected_currencies)
-    closing_cash = closing_cash[selected_currencies].iloc[0] if not closing_cash.empty else pd.Series([0]*len(selected_currencies), index=selected_currencies)
-else:
-    closing_bank = closing_cash = pd.Series([0]*len(selected_currencies), index=selected_currencies)
+    closing_index = df[df["Category"].str.contains("Bank & Cash Balances")].index
+    if len(closing_index) >= 2:
+        closing_data = df.loc[closing_index[1]:]
+        closing_bank = closing_data[closing_data["Category"] == "Bank"]
+        closing_cash = closing_data[closing_data["Category"] == "Cash in Hand"]
+        closing_bank = closing_bank[selected_currencies].iloc[0] if not closing_bank.empty else pd.Series([0]*len(selected_currencies), index=selected_currencies)
+        closing_cash = closing_cash[selected_currencies].iloc[0] if not closing_cash.empty else pd.Series([0]*len(selected_currencies), index=selected_currencies)
+    else:
+        closing_bank = closing_cash = pd.Series([0]*len(selected_currencies), index=selected_currencies)
 
-# Cash in and out
-cash_in_row = week_data[week_data["Category"] == "Cash Ins"]
-cash_in = cash_in_row[selected_currencies].iloc[0] if not cash_in_row.empty else pd.Series([0]*len(selected_currencies), index=selected_currencies)
+    # Cash in and out
+    cash_in_row = week_data[week_data["Category"] == "Cash Ins"]
+    cash_in = cash_in_row[selected_currencies].iloc[0] if not cash_in_row.empty else pd.Series([0]*len(selected_currencies), index=selected_currencies)
 
-cash_out_row = week_data[week_data["Category"] == "Cash Outs"]
-cash_out = cash_out_row[selected_currencies].iloc[0] if not cash_out_row.empty else pd.Series([0]*len(selected_currencies), index=selected_currencies)
+    cash_out_row = week_data[week_data["Category"] == "Cash Outs"]
+    cash_out = cash_out_row[selected_currencies].iloc[0] if not cash_out_row.empty else pd.Series([0]*len(selected_currencies), index=selected_currencies)
 
-# Net change
-net_change = (closing_bank + closing_cash) - (opening_bank + opening_cash)
+    # Net change
+    net_change = (closing_bank + closing_cash) - (opening_bank + opening_cash)
 
-# Summary table
-summary_df = pd.DataFrame({
-    "Opening Bank": opening_bank,
-    "Opening Cash": opening_cash,
-    "Cash In": cash_in,
-    "Cash Out": cash_out,
-    "Closing Bank": closing_bank,
-    "Closing Cash": closing_cash,
-    "Net Change": net_change
-})
+    # Summary table
+    summary_df = pd.DataFrame({
+        "Opening Bank": opening_bank,
+        "Opening Cash": opening_cash,
+        "Cash In": cash_in,
+        "Cash Out": cash_out,
+        "Closing Bank": closing_bank,
+        "Closing Cash": closing_cash,
+        "Net Change": net_change
+    })
 
-st.dataframe(summary_df)
+    st.dataframe(summary_df)
 
-# Download as Excel
-summary_output = io.BytesIO()
-with pd.ExcelWriter(summary_output, engine='openpyxl') as writer:
-    summary_df.to_excel(writer, sheet_name="Weekly Summary")
-st.download_button(
-    label="📥 Download Summary as Excel",
-    data=summary_output.getvalue(),
-    file_name="Weekly_Summary.xlsx",
-    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-)
-
+    # Download button
+    summary_output = io.BytesIO()
+    with pd.ExcelWriter(summary_output, engine='openpyxl') as writer:
+        summary_df.to_excel(writer, sheet_name="Weekly Summary")
+    st.download_button(
+        label="📥 Download Summary as Excel",
+        data=summary_output.getvalue(),
+        file_name="Weekly_Summary.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
 
 # --- Opening Balances ---
 with st.expander("🏦 Opening Balances"):
