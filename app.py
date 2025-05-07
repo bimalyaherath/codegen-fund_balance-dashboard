@@ -28,7 +28,17 @@ week_labels = [f"Week {i+1}" for i in range(len(all_weeks_data))]
 
 # Sidebar for week range, week selection, and currency filter
 st.sidebar.header("🗓️ Select Week Range")
-selected_week_index = st.sidebar.selectbox("Choose a week:", list(range(len(week_labels))), format_func=lambda x: week_labels[x])
+start_date = st.sidebar.date_input("Select start date:", datetime.now())
+end_date = st.sidebar.date_input("Select end date:", datetime.now())
+
+# Filter available weeks based on the selected date range
+selected_weeks = []
+for label in week_labels:
+    week_date = datetime.strptime(label.split()[-1], "%d/%m/%Y")
+    if start_date <= week_date <= end_date:
+        selected_weeks.append(label)
+
+selected_week_index = st.sidebar.selectbox("Choose a specific week:", list(range(len(selected_weeks))), format_func=lambda x: selected_weeks[x])
 selected_week_data = all_weeks_data[selected_week_index]
 
 # Currency filter
@@ -53,7 +63,7 @@ except Exception as e:
 
 # Main Dashboard Title
 st.title("💰 Weekly Fund Dashboard")
-selected_week_name = week_labels[selected_week_index]
+selected_week_name = selected_weeks[selected_week_index]
 st.subheader(f"📅 Week: {selected_week_name}")
 
 # Weekly Summary
@@ -105,10 +115,6 @@ with st.expander("📤 Cash Outs"):
     cash_out_section = selected_week_data[selected_week_data["Category"] == "Cash Outs"]
     if not cash_out_section.empty:
         st.dataframe(cash_out_section[selected_currencies].T.rename(columns={cash_out_section.index[0]: 'Amount'}))
-
-# Charts and Graphs
-with st.expander("📊 Charts and Graphs"):
-    st.write("Charts and graphs for weekly comparison and other relevant metrics will be added here.")
 
 # Full Dataset Download
 with st.expander("📂 View & Download Full Dataset"):
