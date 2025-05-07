@@ -153,7 +153,32 @@ for cur in selected_currencies:
     st.subheader(f'{cur} Balances Over Time')
     st.line_chart(stats)
 
-# 9. Full Dataset
+# 9. Alerts & Thresholds
+st.header('🚨 Alerts & Thresholds')
+# Input thresholds per currency
+thresholds = {}
+for cur in selected_currencies:
+    thresholds[cur] = st.number_input(
+        f'Threshold for net cash change in {cur}',
+        min_value=None, value=0.0, step=1.0, key=f'th_{cur}'
+    )
+# Calculate net for selected week
+ins_week = fund_data[(fund_data['Week']==selected_week) & (fund_data['Section']=='Cash Ins')].groupby('Week')[selected_currencies].sum()
+outs_week = fund_data[(fund_data['Week']==selected_week) & (fund_data['Section']=='Cash Outs')].groupby('Week')[selected_currencies].sum()
+# Ensure we have values
+ins_week = ins_week.reindex([selected_week]).fillna(0)
+outs_week = outs_week.reindex([selected_week]).fillna(0)
+net_week = ins_week - outs_week
+# Show alerts
+for cur in selected_currencies:
+    net_val = float(net_week[cur])
+    th = thresholds[cur]
+    if net_val < th:
+        st.error(f'Alert: Net cash change for {selected_week} in {cur} is {net_val:.2f}, below threshold {th}')
+    else:
+        st.success(f'Net cash change for {selected_week} in {cur} is {net_val:.2f}, meets threshold {th}')
+
+# 10. Full Dataset
 st.header('📁 Full Dataset')
 with st.expander('View Full Dataset'):
     st.dataframe(fund_data)
