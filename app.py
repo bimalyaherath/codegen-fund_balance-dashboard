@@ -77,33 +77,49 @@ st.subheader(f"📅 Week: {selected_week_name}")
 
 # Weekly Summary
 with st.expander("📌 Weekly Summary"):
-    opening_bank = selected_week_data[selected_week_data["Category"] == "Bank"]
-    opening_cash = selected_week_data[selected_week_data["Category"] == "Cash in Hand"]
-    cash_in = selected_week_data[selected_week_data["Category"] == "Cash Ins"]
-    cash_out = selected_week_data[selected_week_data["Category"] == "Cash Outs"]
-    closing_bank = opening_bank.copy()
-    closing_cash = opening_cash.copy()
-    net_change = (closing_bank[selected_currencies].values + closing_cash[selected_currencies].values) - (cash_out[selected_currencies].values)
-    summary_df = pd.DataFrame({
-        "Opening Bank": opening_bank[selected_currencies].iloc[0],
-        "Opening Cash": opening_cash[selected_currencies].iloc[0],
-        "Cash In": cash_in[selected_currencies].iloc[0],
-        "Cash Out": cash_out[selected_currencies].iloc[0],
-        "Closing Bank": closing_bank[selected_currencies].iloc[0],
-        "Closing Cash": closing_cash[selected_currencies].iloc[0],
-        "Net Change": net_change[0]
-    })
-    st.dataframe(summary_df)
-    # Download button
-    output = io.BytesIO()
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        summary_df.to_excel(writer, sheet_name="Weekly Summary")
-    st.download_button(
-        label="📥 Download Summary as Excel",
-        data=output.getvalue(),
-        file_name="Weekly_Summary.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
+    try:
+        # Extract relevant rows
+        opening_bank = selected_week_data[selected_week_data["Category"] == "Bank"]
+        opening_cash = selected_week_data[selected_week_data["Category"] == "Cash in Hand"]
+        cash_in = selected_week_data[selected_week_data["Category"] == "Cash Ins"]
+        cash_out = selected_week_data[selected_week_data["Category"] == "Cash Outs"]
+        
+        # Handle missing data gracefully
+        if not opening_bank.empty and not opening_cash.empty and not cash_in.empty and not cash_out.empty:
+            # Calculate net change
+            closing_bank = opening_bank[selected_currencies].fillna(0)
+            closing_cash = opening_cash[selected_currencies].fillna(0)
+            cash_in_total = cash_in[selected_currencies].fillna(0)
+            cash_out_total = cash_out[selected_currencies].fillna(0)
+            net_change = (closing_bank.values + closing_cash.values) - cash_out_total.values
+            
+            # Prepare summary dataframe
+            summary_df = pd.DataFrame({
+                "Opening Bank": closing_bank.iloc[0],
+                "Opening Cash": closing_cash.iloc[0],
+                "Cash In": cash_in_total.iloc[0],
+                "Cash Out": cash_out_total.iloc[0],
+                "Closing Bank": closing_bank.iloc[0],
+                "Closing Cash": closing_cash.iloc[0],
+                "Net Change": net_change[0]
+            })
+
+            st.dataframe(summary_df)
+
+            # Download button
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                summary_df.to_excel(writer, sheet_name="Weekly Summary")
+            st.download_button(
+                label="📥 Download Summary as Excel",
+                data=output.getvalue(),
+                file_name="Weekly_Summary.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+        else:
+            st.warning("⚠️ Some data is missing for the selected week. Please check the data file.")
+    except KeyError as e:
+        st.error(f"Data not found for selected currencies: {e}")
 
 # Opening Balances
 with st.expander("🏦 Opening Balances"):
