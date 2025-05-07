@@ -11,7 +11,7 @@ from io import BytesIO
 st.title('Weekly Fund Dashboard')
 
 # GitHub file URL (replace with your actual GitHub raw file URL)
-github_url = 'https://raw.githubusercontent.com/YourGitHubUsername/YourRepoName/main/Fund%20Balance%20Database%20Format%20-%20New.xlsx'
+github_url = 'https://raw.githubusercontent.com/Bimalya/Fund-Balance-Dashboard/main/Fund%20Balance%20Database%20Format%20-%20New.xlsx'
 
 # Attempt to load the Excel file from GitHub
 try:
