@@ -36,6 +36,7 @@ def load_fund_data():
         all_weeks.append(week_df)
     return pd.concat(all_weeks, ignore_index=True) if all_weeks else pd.DataFrame()
 
+# Load data
 fund_data = load_fund_data()
 if fund_data.empty:
     st.error("No weekly fund data found. Upload 'Fund_Balance_*.xlsx' files to the repo root, 'data/' or '/mnt/data'.")
@@ -43,7 +44,6 @@ if fund_data.empty:
 
 # 2. Sidebar Settings
 st.sidebar.title('Dashboard Settings')
-
 # Week selector
 weeks = sorted(fund_data['Week'].unique())
 selected_week = st.sidebar.selectbox('Select Week', weeks)
@@ -55,7 +55,6 @@ except ValueError:
     start_dt, end_dt = None, None
 if end_dt and end_dt.date() > dt.date.today():
     st.sidebar.error('⚠️ Selected week is in the future!')
-
 # Currency multiselect
 currencies = ['LKR','USD','GBP','AUD','DKK','EUR','MXN','INR','AED']
 selected_currencies = st.sidebar.multiselect('Select Currencies', currencies, default=['LKR'])
@@ -94,28 +93,26 @@ if start_dt and end_dt:
 st.subheader(subtitle)
 
 # Filter for selected week
-week_df = fund_data[fund_data['Week'] == selected_week]
+df_week = fund_data[fund_data['Week'] == selected_week]
 
 # 4. Weekly Summary
 st.header('🔖 Weekly Summary')
-summary_df = week_df.groupby('Section')[selected_currencies].sum().reset_index()
-summary_df.columns = ['Category'] + [f'Total {cur}' for cur in selected_currencies]
-st.table(summary_df)
-st.download_button(label='Download Weekly Summary', data=summary_df.to_csv(index=False), file_name=f"{selected_week}_Weekly_Summary.csv", mime='text/csv')
+summary = df_week.groupby('Section')[selected_currencies].sum().reset_index()
+summary.columns = ['Category'] + [f'Total {cur}' for cur in selected_currencies]
+st.table(summary)
+st.download_button(label='Download Weekly Summary', data=summary.to_csv(index=False), file_name=f"{selected_week}_Weekly_Summary.csv", mime='text/csv')
 
-# 5. Cash Ins & Outs Breakdown
-st.header('📂 Cash Ins & Outs Breakdown')
-# Cash Ins
-cash_ins = week_df[week_df['Section'] == 'Cash Ins'][['Details'] + selected_currencies]
-cash_ins.columns = ['Category'] + selected_currencies
-st.subheader('Cash Ins')
-st.table(cash_ins)
+# 5. Cash Ins & Cash Outs Breakdown as dropdowns
+st.header('📂 Breakdown Details')
+with st.expander('Cash Ins Breakdown'):
+    ins = df_week[df_week['Section'] == 'Cash Ins'][['Details'] + selected_currencies]
+    ins.columns = ['Category'] + selected_currencies
+    st.table(ins)
 
-# Cash Outs
-cash_outs = week_df[week_df['Section'] == 'Cash Outs'][['Details'] + selected_currencies]
-cash_outs.columns = ['Category'] + selected_currencies
-st.subheader('Cash Outs')
-st.table(cash_outs)
+with st.expander('Cash Outs Breakdown'):
+    outs = df_week[df_week['Section'] == 'Cash Outs'][['Details'] + selected_currencies]
+    outs.columns = ['Category'] + selected_currencies
+    st.table(outs)
 
 # 6. Charts & Graphs
 st.header('📈 Charts & Graphs')
@@ -123,7 +120,7 @@ ins_trend = fund_data[fund_data['Section']=='Cash Ins'].groupby('Week')[selected
 st.line_chart(ins_trend)
 outs_trend = fund_data[fund_data['Section']=='Cash Outs'].groupby('Week')[selected_currencies].sum()
 st.line_chart(outs_trend)
-chart_df = week_df.groupby('Section')[selected_currencies].sum().reset_index()
+chart_df = df_week.groupby('Section')[selected_currencies].sum().reset_index()
 st.bar_chart(chart_df.set_index('Section'))
 
 # 7. Full Dataset
