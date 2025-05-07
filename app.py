@@ -103,7 +103,7 @@ st.table(summary)
 st.download_button(label='Download Weekly Summary', data=summary.to_csv(index=False), file_name=f"{selected_week}_Weekly_Summary.csv", mime='text/csv')
 
 # 5. Cash Ins & Cash Outs Breakdown as dropdowns
-st.header('📂 Breakdown Details')
+st.header('📂 Cash Ins & Outs Breakdown')
 with st.expander('Cash Ins Breakdown'):
     ins = df_week[df_week['Section'] == 'Cash Ins'][['Details'] + selected_currencies]
     ins.columns = ['Category'] + selected_currencies
@@ -114,7 +114,7 @@ with st.expander('Cash Outs Breakdown'):
     outs.columns = ['Category'] + selected_currencies
     st.table(outs)
 
-# 6. Charts & Graphs
+# 6. Charts & Graphs Charts & Graphs
 st.header('📈 Charts & Graphs')
 ins_trend = fund_data[fund_data['Section']=='Cash Ins'].groupby('Week')[selected_currencies].sum()
 st.line_chart(ins_trend)
