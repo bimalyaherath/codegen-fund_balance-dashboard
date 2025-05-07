@@ -291,7 +291,23 @@ else:
 
 # 10. Full Dataset
 st.header('📁 Full Dataset')
-st.dataframe(fund_data)
+# Note about filtering and download
+st.info('You can filter the dataset using the search box below and download the resulting subset.')
+with st.expander('View & Filter Full Dataset'):
+    # Text filter on Details column
+    filter_text = st.text_input('Filter by Details (case-insensitive)', '')
+    if filter_text:
+        filtered_df = fund_data[fund_data['Details'].str.contains(filter_text, case=False, na=False)]
+    else:
+        filtered_df = fund_data
+    st.dataframe(filtered_df)
+    st.download_button(
+        label='Download Filtered Dataset',
+        data=filtered_df.to_csv(index=False),
+        file_name='Filtered_Weekly_Fund_Data.csv',
+        mime='text/csv'
+    )
 
+# Footer
 st.write('---')
 st.caption('Created with ❤️ using Streamlit & GitHub')
