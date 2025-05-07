@@ -25,12 +25,12 @@ selected_week = st.sidebar.selectbox("Select the week:", weeks)
 
 # Sidebar for currency filter
 st.sidebar.header("💱 Select Currencies")
+currency_columns = ['LKR', 'USD', 'GBP', 'AUD', 'DKK', 'EUR', 'MXN', 'INR', 'AED', 'Total in LKR', 'Total in USD']
 selected_currencies = st.sidebar.multiselect(
     "Choose one or more currencies:",
-    ['LKR', 'USD', 'GBP', 'AUD', 'DKK', 'EUR', 'MXN', 'INR', 'AED', 'Total in LKR', 'Total in USD'],
+    currency_columns,
     default=["LKR", "USD"]
 )
-
 
 # --- Filter Data by Week ---
 week_index = df[df["Category"] == selected_week].index[0]
