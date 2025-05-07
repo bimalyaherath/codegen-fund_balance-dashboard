@@ -18,6 +18,9 @@ df = load_data()
 st.title("💰 Weekly Fund Dashboard")
 
 # --- Define filters ---
+import requests
+import streamlit as st
+
 # Sidebar for week selection
 st.sidebar.header("🗓️ Select Week")
 weeks = df[df["Category"].str.contains("Bank & Cash Balances")]["Category"].unique()
@@ -31,6 +34,24 @@ selected_currencies = st.sidebar.multiselect(
     currency_columns,
     default=["LKR", "USD"]
 )
+
+# Live Currency Converter
+st.sidebar.header("💸 Currency Converter")
+base_currency = st.sidebar.selectbox("From Currency", currency_columns, index=0)
+target_currency = st.sidebar.selectbox("To Currency", currency_columns, index=1)
+amount = st.sidebar.number_input(f"Amount in {base_currency}", min_value=0.0, value=100.0, step=1.0)
+
+# Fetch conversion rate
+api_url = f"https://api.exchangerate-api.com/v4/latest/{base_currency}"
+try:
+    response = requests.get(api_url)
+    data = response.json()
+    rate = data["rates"].get(target_currency, 1)
+    converted_value = amount * rate
+    st.sidebar.success(f"{amount} {base_currency} = {converted_value:.2f} {target_currency}")
+except Exception as e:
+    st.sidebar.error(f"Failed to fetch exchange rate: {e}")
+
 
 # --- Filter Data by Week ---
 week_index = df[df["Category"] == selected_week].index[0]
