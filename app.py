@@ -3,6 +3,7 @@ import pandas as pd
 import datetime as dt
 import glob
 import os
+import requests
 
 # 1. Load and clean all weekly Excel files
 @st.cache_data
@@ -65,15 +66,31 @@ if not selected_currencies:
     st.sidebar.error('Select at least one currency')
     st.stop()
 
-# C. Currency converter
+# C. Live Currency converter using exchangerate.host
+@st.cache_data(ttl=3600)
+def get_rate(base: str, symbol: str) -> float:
+    try:
+        resp = requests.get(
+            'https://api.exchangerate.host/latest',
+            params={'base': base, 'symbols': symbol}
+        )
+        data = resp.json()
+        return data.get('rates', {}).get(symbol)
+    except Exception:
+        return None
+
 st.sidebar.header('Currency Converter')
-amount = st.sidebar.number_input('Amount', min_value=0.0, value=1.0, step=0.1)
-from_cur = st.sidebar.selectbox('From', currencies, index=0)
-to_cur = st.sidebar.selectbox('To', currencies, index=1)
-rate = st.sidebar.number_input(f'Rate ({from_cur}→{to_cur})', min_value=0.0001, value=1.0, step=0.0001)
-converted = amount * rate
-st.sidebar.write(f'{amount} {from_cur} = {converted:.2f} {to_cur}')
-st.sidebar.info('Note: Historical fund values used the exchange rates of that period.')
+amount = st.sidebar.number_input('Amount to convert', min_value=0.0, value=1.0, step=0.1)
+from_cur = st.sidebar.selectbox('From Currency', currencies, index=0)
+to_cur = st.sidebar.selectbox('To Currency', currencies, index=1)
+rate = get_rate(from_cur, to_cur)
+if rate:
+    converted = amount * rate
+    st.sidebar.write(f'1 {from_cur} = {rate:.4f} {to_cur}')
+    st.sidebar.write(f'{amount} {from_cur} = {converted:.2f} {to_cur}')
+else:
+    st.sidebar.error('Failed to fetch live exchange rate.')
+st.sidebar.info('Rates are fetched live from exchangerate.host')
 
 # 3. Main Title
 st.title('📊 Weekly Fund Dashboard')
@@ -88,7 +105,6 @@ week_df = fund_data[fund_data['Week'] == selected_week]
 # 4. Weekly Summary
 st.header('🔖 Weekly Summary')
 summary_df = week_df.groupby('Section')[selected_currencies].sum().reset_index()
-# Rename for display
 col_names = ['Category'] + [f'Total {cur}' for cur in selected_currencies]
 summary_df.columns = col_names
 st.table(summary_df)
