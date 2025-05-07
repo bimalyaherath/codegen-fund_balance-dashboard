@@ -66,13 +66,13 @@ if not selected_currencies:
     st.sidebar.error('Select at least one currency')
     st.stop()
 
-# C. Live Currency converter using exchangerate.host
+# C. Live Currency converter with fallback
 @st.cache_data(ttl=3600)
 def get_rate(base: str, symbol: str) -> float:
     try:
         resp = requests.get(
             'https://api.exchangerate.host/latest',
-            params={'base': base, 'symbols': symbol}
+            params={'base': base, 'symbols': symbol}, timeout=5
         )
         data = resp.json()
         return data.get('rates', {}).get(symbol)
@@ -80,17 +80,19 @@ def get_rate(base: str, symbol: str) -> float:
         return None
 
 st.sidebar.header('Currency Converter')
-amount = st.sidebar.number_input('Amount to convert', min_value=0.0, value=1.0, step=0.1)
-from_cur = st.sidebar.selectbox('From Currency', currencies, index=0)
-to_cur = st.sidebar.selectbox('To Currency', currencies, index=1)
+amount = st.sidebar.number_input('Amount', min_value=0.0, value=1.0, step=0.1)
+from_cur = st.sidebar.selectbox('From', currencies, index=0)
+to_cur = st.sidebar.selectbox('To', currencies, index=1)
+# Attempt live rate
 rate = get_rate(from_cur, to_cur)
 if rate:
-    converted = amount * rate
-    st.sidebar.write(f'1 {from_cur} = {rate:.4f} {to_cur}')
-    st.sidebar.write(f'{amount} {from_cur} = {converted:.2f} {to_cur}')
+    st.sidebar.write(f'Live rate: 1 {from_cur} = {rate:.4f} {to_cur}')
 else:
-    st.sidebar.error('Failed to fetch live exchange rate.')
-st.sidebar.info('Rates are fetched live from exchangerate.host')
+    st.sidebar.warning('Could not fetch live rate; please enter manually:')
+    rate = st.sidebar.number_input(f'Manual rate ({from_cur}→{to_cur})', min_value=0.0001, value=1.0, step=0.0001)
+converted = amount * rate
+st.sidebar.write(f'{amount} {from_cur} = {converted:.2f} {to_cur}')
+st.sidebar.info('Live rates via exchangerate.host; cached hourly.')
 
 # 3. Main Title
 st.title('📊 Weekly Fund Dashboard')
@@ -126,13 +128,10 @@ for section in ['Bank & Cash Balances','Cash Ins','Cash Outs']:
 
 # 6. Charts & Graphs
 st.header('📈 Charts & Graphs')
-# Cash Ins Trend
 ins_trend_df = fund_data[fund_data['Section']=='Cash Ins'].groupby('Week')[selected_currencies].sum()
 st.line_chart(ins_trend_df)
-# Cash Outs Trend
 outs_trend_df = fund_data[fund_data['Section']=='Cash Outs'].groupby('Week')[selected_currencies].sum()
 st.line_chart(outs_trend_df)
-# Bar Chart for Selected Week
 chart_df = week_df.groupby('Section')[selected_currencies].sum().reset_index()
 st.bar_chart(chart_df.set_index('Section'))
 
