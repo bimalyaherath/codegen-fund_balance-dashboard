@@ -33,22 +33,19 @@ st.sidebar.header("🗓️ Select Week Range")
 start_date = st.sidebar.date_input("Select start date:", datetime.now().date())
 end_date = st.sidebar.date_input("Select end date:", datetime.now().date())
 
-# Filter available weeks based on the selected date range
-selected_weeks = []
-for label in week_labels:
-    try:
-        # Extract the date part after the last hyphen
-        week_date_str = label.split("-")[-1].strip()
-        week_date = datetime.strptime(week_date_str, "%d/%m/%Y").date()
-        # Check if the date is within the selected range
-        if start_date <= week_date <= end_date:
-            selected_weeks.append(label)
-    except ValueError:
-        # Skip labels without valid date parts
-        continue
-
-selected_week_index = st.sidebar.selectbox("Choose a specific week:", list(range(len(selected_weeks))), format_func=lambda x: selected_weeks[x])
-selected_week_data = all_weeks_data[selected_week_index]
+# Ensure the end date is not earlier than the start date
+if start_date > end_date:
+    st.sidebar.error("End date cannot be earlier than start date")
+else:
+    # Filter available weeks based on the selected date range
+    valid_weeks = [i for i, label in enumerate(week_labels) if start_date <= datetime.strptime(label.split('-')[-1].strip(), "%d/%m/%Y").date() <= end_date]
+    
+    # Prevent empty week selection
+    if valid_weeks:
+        selected_week_index = st.sidebar.selectbox("Choose a specific week:", valid_weeks, format_func=lambda x: week_labels[x])
+        selected_week_data = all_weeks_data[selected_week_index]
+    else:
+        st.sidebar.warning("No weeks available in the selected date range")
 
 # Extract currency columns
 currency_columns = [col for col in selected_week_data.columns if col not in ['Category', 'Unnamed: 0']]
