@@ -28,8 +28,8 @@ week_labels = [f"Week {i+1} - {datetime.now().strftime('%d/%m/%Y')}" for i in ra
 
 # Sidebar for week range, week selection, and currency filter
 st.sidebar.header("🗓️ Select Week Range")
-start_date = st.sidebar.date_input("Select start date:", datetime.now())
-end_date = st.sidebar.date_input("Select end date:", datetime.now())
+start_date = st.sidebar.date_input("Select start date:", datetime.now()).date()
+end_date = st.sidebar.date_input("Select end date:", datetime.now()).date()
 
 # Filter available weeks based on the selected date range
 selected_weeks = []
@@ -37,7 +37,7 @@ for label in week_labels:
     try:
         # Extract the date part after the last hyphen
         week_date_str = label.split("-")[-1].strip()
-        week_date = datetime.strptime(week_date_str, "%d/%m/%Y")
+        week_date = datetime.strptime(week_date_str, "%d/%m/%Y").date()
         # Check if the date is within the selected range
         if start_date <= week_date <= end_date:
             selected_weeks.append(label)
