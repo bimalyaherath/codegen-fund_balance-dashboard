@@ -5,7 +5,7 @@ import glob
 import os
 import requests
 
-# 1. Load and clean all weekly Excel files
+# 1. Load and clean weekly Excel files
 @st.cache_data
 def load_fund_data():
     paths = glob.glob('data/Fund_Balance_*.xlsx') \
@@ -13,8 +13,7 @@ def load_fund_data():
              + glob.glob('Fund_Balance_*.xlsx')
     all_weeks = []
     for file in paths:
-        base = os.path.basename(file).replace('Fund_Balance_','').replace('.xlsx','')
-        week_label = base
+        week_label = os.path.basename(file).replace('Fund_Balance_','').replace('.xlsx','')
         try:
             df = pd.read_excel(file)
         except Exception as e:
@@ -35,19 +34,16 @@ def load_fund_data():
         week_df = pd.concat(parts, ignore_index=True)
         week_df['Week'] = week_label
         all_weeks.append(week_df)
-    if not all_weeks:
-        return pd.DataFrame()
-    return pd.concat(all_weeks, ignore_index=True)
+    return pd.concat(all_weeks, ignore_index=True) if all_weeks else pd.DataFrame()
 
 fund_data = load_fund_data()
 if fund_data.empty:
     st.error("No weekly fund data found. Upload 'Fund_Balance_*.xlsx' files to the repo root, 'data/' or '/mnt/data'.")
     st.stop()
 
-# 2. Sidebar: Settings
+# 2. Sidebar Settings
 st.sidebar.title('Dashboard Settings')
-
-# A. Week selector
+# Week selector
 weeks = sorted(fund_data['Week'].unique())
 selected_week = st.sidebar.selectbox('Select Week', weeks)
 try:
@@ -58,64 +54,49 @@ except ValueError:
     start_dt, end_dt = None, None
 if end_dt and end_dt.date() > dt.date.today():
     st.sidebar.error('⚠️ Selected week is in the future!')
-
-# B. Currency multiselect
+# Currency multiselect
 currencies = ['LKR','USD','GBP','AUD','DKK','EUR','MXN','INR','AED']
 selected_currencies = st.sidebar.multiselect('Select Currencies', currencies, default=['LKR'])
 if not selected_currencies:
     st.sidebar.error('Select at least one currency')
     st.stop()
 
-# C. Live Currency converter with fallback
+# Live Currency Converter (no manual fallback)
 @st.cache_data(ttl=3600)
 def get_rate(base: str, symbol: str) -> float:
-    try:
-        resp = requests.get(
-            'https://api.exchangerate.host/latest',
-            params={'base': base, 'symbols': symbol}, timeout=5
-        )
-        data = resp.json()
-        return data.get('rates', {}).get(symbol)
-    except Exception:
-        return None
+    resp = requests.get('https://api.exchangerate.host/latest', params={'base': base, 'symbols': symbol}, timeout=5)
+    data = resp.json()
+    return data.get('rates', {}).get(symbol)
 
 st.sidebar.header('Currency Converter')
-amount = st.sidebar.number_input('Amount', min_value=0.0, value=1.0, step=0.1)
-from_cur = st.sidebar.selectbox('From', currencies, index=0)
-to_cur = st.sidebar.selectbox('To', currencies, index=1)
-# Attempt live rate
+amount = st.sidebar.number_input('Amount to convert', min_value=0.0, value=1.0, step=0.1)
+from_cur = st.sidebar.selectbox('From Currency', currencies, index=0)
+to_cur = st.sidebar.selectbox('To Currency', currencies, index=1)
 rate = get_rate(from_cur, to_cur)
-if rate:
-    st.sidebar.write(f'Live rate: 1 {from_cur} = {rate:.4f} {to_cur}')
+if rate is None:
+    st.sidebar.error('Failed to fetch live exchange rate. Please try again later.')
 else:
-    st.sidebar.warning('Could not fetch live rate; please enter manually:')
-    rate = st.sidebar.number_input(f'Manual rate ({from_cur}→{to_cur})', min_value=0.0001, value=1.0, step=0.0001)
-converted = amount * rate
-st.sidebar.write(f'{amount} {from_cur} = {converted:.2f} {to_cur}')
-st.sidebar.info('Live rates via exchangerate.host; cached hourly.')
+    converted = amount * rate
+    st.sidebar.write(f'1 {from_cur} = {rate:.4f} {to_cur}')
+    st.sidebar.write(f'{amount} {from_cur} = {converted:.2f} {to_cur}')
+    st.sidebar.info('Rates fetched live from exchangerate.host')
 
-# 3. Main Title
+# 3. Main Dashboard Header
 st.title('📊 Weekly Fund Dashboard')
 subtitle = selected_week.replace('_', ' ')
 if start_dt and end_dt:
     subtitle += f' ({start_dt.date()} to {end_dt.date()})'
 st.subheader(subtitle)
 
-# Filter data by week
+# Filter for selected week
 week_df = fund_data[fund_data['Week'] == selected_week]
 
 # 4. Weekly Summary
 st.header('🔖 Weekly Summary')
 summary_df = week_df.groupby('Section')[selected_currencies].sum().reset_index()
-col_names = ['Category'] + [f'Total {cur}' for cur in selected_currencies]
-summary_df.columns = col_names
+summary_df.columns = ['Category'] + [f'Total {cur}' for cur in selected_currencies]
 st.table(summary_df)
-st.download_button(
-    label='Download Weekly Summary',
-    data=summary_df.to_csv(index=False),
-    file_name=f"{selected_week}_Weekly_Summary.csv",
-    mime='text/csv'
-)
+st.download_button(label='Download Weekly Summary', data=summary_df.to_csv(index=False), file_name=f"{selected_week}_Weekly_Summary.csv", mime='text/csv')
 
 # 5. Detailed Breakdown
 st.header('📂 Detailed Breakdown')
@@ -128,10 +109,10 @@ for section in ['Bank & Cash Balances','Cash Ins','Cash Outs']:
 
 # 6. Charts & Graphs
 st.header('📈 Charts & Graphs')
-ins_trend_df = fund_data[fund_data['Section']=='Cash Ins'].groupby('Week')[selected_currencies].sum()
-st.line_chart(ins_trend_df)
-outs_trend_df = fund_data[fund_data['Section']=='Cash Outs'].groupby('Week')[selected_currencies].sum()
-st.line_chart(outs_trend_df)
+ins_trend = fund_data[fund_data['Section']=='Cash Ins'].groupby('Week')[selected_currencies].sum()
+st.line_chart(ins_trend)
+outs_trend = fund_data[fund_data['Section']=='Cash Outs'].groupby('Week')[selected_currencies].sum()
+st.line_chart(outs_trend)
 chart_df = week_df.groupby('Section')[selected_currencies].sum().reset_index()
 st.bar_chart(chart_df.set_index('Section'))
 
@@ -139,12 +120,7 @@ st.bar_chart(chart_df.set_index('Section'))
 st.header('📁 Full Dataset')
 with st.expander('View Full Dataset'):
     st.dataframe(fund_data)
-    st.download_button(
-        label='Download Full Dataset',
-        data=fund_data.to_csv(index=False),
-        file_name='Full_Weekly_Fund_Data.csv',
-        mime='text/csv'
-    )
+    st.download_button(label='Download Full Dataset', data=fund_data.to_csv(index=False), file_name='Full_Weekly_Fund_Data.csv', mime='text/csv')
 
 # Footer
 st.write('---')
