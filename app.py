@@ -61,10 +61,13 @@ if not selected_currencies:
     st.sidebar.error('Select at least one currency')
     st.stop()
 
-# Live Currency Converter (no manual fallback)
+# Live Currency Converter
 @st.cache_data(ttl=3600)
 def get_rate(base: str, symbol: str) -> float:
-    resp = requests.get('https://api.exchangerate.host/latest', params={'base': base, 'symbols': symbol}, timeout=5)
+    resp = requests.get(
+        'https://api.exchangerate.host/latest',
+        params={'base': base, 'symbols': symbol}, timeout=5
+    )
     data = resp.json()
     return data.get('rates', {}).get(symbol)
 
@@ -74,7 +77,7 @@ from_cur = st.sidebar.selectbox('From Currency', currencies, index=0)
 to_cur = st.sidebar.selectbox('To Currency', currencies, index=1)
 rate = get_rate(from_cur, to_cur)
 if rate is None:
-    st.sidebar.error('Failed to fetch live exchange rate. Please try again later.')
+    st.sidebar.error('Failed to fetch live exchange rate.')
 else:
     converted = amount * rate
     st.sidebar.write(f'1 {from_cur} = {rate:.4f} {to_cur}')
@@ -96,18 +99,14 @@ st.header('🔖 Weekly Summary')
 summary_df = week_df.groupby('Section')[selected_currencies].sum().reset_index()
 summary_df.columns = ['Category'] + [f'Total {cur}' for cur in selected_currencies]
 st.table(summary_df)
-st.download_button(label='Download Weekly Summary', data=summary_df.to_csv(index=False), file_name=f"{selected_week}_Weekly_Summary.csv", mime='text/csv')
+st.download_button(
+    label='Download Weekly Summary',
+    data=summary_df.to_csv(index=False),
+    file_name=f"{selected_week}_Weekly_Summary.csv",
+    mime='text/csv'
+)
 
-# 5. Detailed Breakdown
-st.header('📂 Detailed Breakdown')
-for section in ['Bank & Cash Balances','Cash Ins','Cash Outs']:
-    sec_df = week_df[week_df['Section'].str.contains(section, na=False)]
-    with st.expander(section):
-        cols = ['Details'] + selected_currencies + ['Total in LKR', 'Total in USD']
-        display_df = sec_df[cols].rename(columns={'Details':'Category'})
-        st.table(display_df)
-
-# 6. Charts & Graphs
+# 5. Charts & Graphs
 st.header('📈 Charts & Graphs')
 ins_trend = fund_data[fund_data['Section']=='Cash Ins'].groupby('Week')[selected_currencies].sum()
 st.line_chart(ins_trend)
@@ -116,11 +115,16 @@ st.line_chart(outs_trend)
 chart_df = week_df.groupby('Section')[selected_currencies].sum().reset_index()
 st.bar_chart(chart_df.set_index('Section'))
 
-# 7. Full Dataset
+# 6. Full Dataset
 st.header('📁 Full Dataset')
 with st.expander('View Full Dataset'):
     st.dataframe(fund_data)
-    st.download_button(label='Download Full Dataset', data=fund_data.to_csv(index=False), file_name='Full_Weekly_Fund_Data.csv', mime='text/csv')
+    st.download_button(
+        label='Download Full Dataset',
+        data=fund_data.to_csv(index=False),
+        file_name='Full_Weekly_Fund_Data.csv',
+        mime='text/csv'
+    )
 
 # Footer
 st.write('---')
