@@ -6,16 +6,31 @@ import seaborn as sns
 import numpy as np
 import requests
 from io import BytesIO
+import os
 
 # Set the title for the Streamlit app
 st.title('Weekly Fund Dashboard')
 
-# GitHub file URL (replace with your actual GitHub raw file URL)
-github_url = https://raw.githubusercontent.com/Bimalya/codegen-fund_balance-dashboard/main/Fund%20Balance%20Database%20Format%20-%20New.xlsx
+# GitHub repository details
+github_repo_url = 'https://raw.githubusercontent.com/Bimalya/codegen-fund_balance-dashboard/main/'
 
-# Attempt to load the Excel file from GitHub
+# Automatically detect available Excel files
+file_list = [
+    'Fund_Balance_March_31_to_April_4.xlsx',
+    'Fund_Balance_April_4_to_April_11.xlsx',
+    'Fund_Balance_April_11_to_April_18.xlsx',
+    'Fund_Balance_April_18_to_April_25.xlsx'
+]
+
+# Sidebar for selecting the Excel file
+selected_file = st.sidebar.selectbox('Select Weekly Fund File', file_list)
+
+# Construct the full file URL
+file_url = github_repo_url + selected_file
+
 try:
-    response = requests.get(github_url)
+    # Fetch the selected file from GitHub
+    response = requests.get(file_url)
     response.raise_for_status()
     excel_file = pd.ExcelFile(BytesIO(response.content))
     weeks = excel_file.sheet_names
