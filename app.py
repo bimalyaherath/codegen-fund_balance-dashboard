@@ -43,6 +43,7 @@ if fund_data.empty:
 
 # 2. Sidebar Settings
 st.sidebar.title('Dashboard Settings')
+
 # Week selector
 weeks = sorted(fund_data['Week'].unique())
 selected_week = st.sidebar.selectbox('Select Week', weeks)
@@ -54,6 +55,7 @@ except ValueError:
     start_dt, end_dt = None, None
 if end_dt and end_dt.date() > dt.date.today():
     st.sidebar.error('⚠️ Selected week is in the future!')
+
 # Currency multiselect
 currencies = ['LKR','USD','GBP','AUD','DKK','EUR','MXN','INR','AED']
 selected_currencies = st.sidebar.multiselect('Select Currencies', currencies, default=['LKR'])
@@ -99,14 +101,23 @@ st.header('🔖 Weekly Summary')
 summary_df = week_df.groupby('Section')[selected_currencies].sum().reset_index()
 summary_df.columns = ['Category'] + [f'Total {cur}' for cur in selected_currencies]
 st.table(summary_df)
-st.download_button(
-    label='Download Weekly Summary',
-    data=summary_df.to_csv(index=False),
-    file_name=f"{selected_week}_Weekly_Summary.csv",
-    mime='text/csv'
-)
+st.download_button(label='Download Weekly Summary', data=summary_df.to_csv(index=False), file_name=f"{selected_week}_Weekly_Summary.csv", mime='text/csv')
 
-# 5. Charts & Graphs
+# 5. Cash Ins & Outs Breakdown
+st.header('📂 Cash Ins & Outs Breakdown')
+# Cash Ins
+cash_ins = week_df[week_df['Section'] == 'Cash Ins'][['Details'] + selected_currencies]
+cash_ins.columns = ['Category'] + selected_currencies
+st.subheader('Cash Ins')
+st.table(cash_ins)
+
+# Cash Outs
+cash_outs = week_df[week_df['Section'] == 'Cash Outs'][['Details'] + selected_currencies]
+cash_outs.columns = ['Category'] + selected_currencies
+st.subheader('Cash Outs')
+st.table(cash_outs)
+
+# 6. Charts & Graphs
 st.header('📈 Charts & Graphs')
 ins_trend = fund_data[fund_data['Section']=='Cash Ins'].groupby('Week')[selected_currencies].sum()
 st.line_chart(ins_trend)
@@ -115,16 +126,11 @@ st.line_chart(outs_trend)
 chart_df = week_df.groupby('Section')[selected_currencies].sum().reset_index()
 st.bar_chart(chart_df.set_index('Section'))
 
-# 6. Full Dataset
+# 7. Full Dataset
 st.header('📁 Full Dataset')
 with st.expander('View Full Dataset'):
     st.dataframe(fund_data)
-    st.download_button(
-        label='Download Full Dataset',
-        data=fund_data.to_csv(index=False),
-        file_name='Full_Weekly_Fund_Data.csv',
-        mime='text/csv'
-    )
+    st.download_button(label='Download Full Dataset', data=fund_data.to_csv(index=False), file_name='Full_Weekly_Fund_Data.csv', mime='text/csv')
 
 # Footer
 st.write('---')
