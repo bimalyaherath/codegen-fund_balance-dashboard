@@ -24,7 +24,22 @@ def load_data(file_path):
 all_weeks_data = load_data(DATA_FILE)
 
 # Extract available weeks
-week_labels = [f"Week {i+1}" for i in range(len(all_weeks_data))]
+week_labels = [f"Week {i+1} - {datetime.now().strftime('%d/%m/%Y')}" for i in range(len(all_weeks_data))]
+
+# Filter weeks based on selected date range
+selected_weeks = []
+for label in week_labels:
+    try:
+        # Extract the date part after the last hyphen
+        week_date_str = label.split("-")[-1].strip()
+        week_date = datetime.strptime(week_date_str, "%d/%m/%Y")
+        
+        # Check if the date is within the selected range
+        if start_date <= week_date <= end_date:
+            selected_weeks.append(label)
+    except ValueError:
+        # Skip labels without valid date parts
+        continue
 
 # Sidebar for week range, week selection, and currency filter
 st.sidebar.header("🗓️ Select Week Range")
