@@ -18,11 +18,19 @@ df = load_data()
 st.title("💰 Weekly Fund Dashboard")
 
 # --- Define filters ---
+# Sidebar for week selection
+st.sidebar.header("🗓️ Select Week")
 weeks = df[df["Category"].str.contains("Bank & Cash Balances")]["Category"].unique()
-selected_week = st.selectbox("📅 Select Week", weeks)
+selected_week = st.sidebar.selectbox("Select the week:", weeks)
 
-currency_columns = ['LKR', 'USD', 'GBP', 'AUD', 'DKK', 'EUR', 'MXN', 'INR', 'AED', 'Total in LKR', 'Total in USD']
-selected_currencies = st.multiselect("💱 Select Currencies", currency_columns, default=["LKR", "USD"])
+# Sidebar for currency filter
+st.sidebar.header("💱 Select Currencies")
+selected_currencies = st.sidebar.multiselect(
+    "Choose one or more currencies:",
+    ['LKR', 'USD', 'GBP', 'AUD', 'DKK', 'EUR', 'MXN', 'INR', 'AED', 'Total in LKR', 'Total in USD'],
+    default=["LKR", "USD"]
+)
+
 
 # --- Filter Data by Week ---
 week_index = df[df["Category"] == selected_week].index[0]
