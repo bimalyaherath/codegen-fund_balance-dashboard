@@ -26,10 +26,12 @@ all_weeks_data = load_data(DATA_FILE)
 # Extract available weeks
 week_labels = [f"Week {i+1} - {datetime.now().strftime('%d/%m/%Y')}" for i in range(len(all_weeks_data))]
 
-# Sidebar for week range, week selection, and currency filter
+from datetime import date
+
+# Sidebar for week range
 st.sidebar.header("🗓️ Select Week Range")
-start_date = st.sidebar.date_input("Select start date:", datetime.now()).date()
-end_date = st.sidebar.date_input("Select end date:", datetime.now()).date()
+start_date = st.sidebar.date_input("Select start date:", date.today())
+end_date = st.sidebar.date_input("Select end date:", date.today())
 
 # Filter available weeks based on the selected date range
 selected_weeks = []
