@@ -19,28 +19,21 @@ st.title("💰 Weekly Fund Dashboard")
 
 # --- Define filters ---
 from datetime import datetime
-import pandas as pd
 
 # Extract available weeks
 week_labels = df[df["Category"].str.contains("Bank & Cash Balances")]["Category"].unique()
 
 # Extract dates from week labels
-week_dates = [datetime.strptime(label.split("-")[-1].strip(), "%d/%m/%Y") for label in week_labels]
+week_dates = [datetime.strptime(label.split("-")[-1].strip(), "%d/%m/%Y").date() for label in week_labels]
 
 # Add date range picker
 st.sidebar.header("🗓️ Select Week Range")
-date_range = st.sidebar.date_input(
+start_date, end_date = st.sidebar.date_input(
     "Select week range:",
     (min(week_dates), max(week_dates)),
     min_value=min(week_dates),
     max_value=max(week_dates)
 )
-
-# Unpack the tuple
-if isinstance(date_range, tuple):
-    start_date, end_date = date_range
-else:
-    start_date = end_date = date_range
 
 # Filter weeks based on selected range
 selected_weeks = [label for label, date in zip(week_labels, week_dates) if start_date <= date <= end_date]
@@ -49,7 +42,6 @@ if not selected_weeks:
     st.sidebar.warning("⚠️ No data available for the selected date range.")
 else:
     selected_week = st.sidebar.selectbox("Choose a specific week:", selected_weeks)
-
 
 # Sidebar for currency filter
 st.sidebar.header("💱 Select Currencies")
