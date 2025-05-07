@@ -26,21 +26,6 @@ all_weeks_data = load_data(DATA_FILE)
 # Extract available weeks
 week_labels = [f"Week {i+1} - {datetime.now().strftime('%d/%m/%Y')}" for i in range(len(all_weeks_data))]
 
-# Filter weeks based on selected date range
-selected_weeks = []
-for label in week_labels:
-    try:
-        # Extract the date part after the last hyphen
-        week_date_str = label.split("-")[-1].strip()
-        week_date = datetime.strptime(week_date_str, "%d/%m/%Y")
-        
-        # Check if the date is within the selected range
-        if start_date <= week_date <= end_date:
-            selected_weeks.append(label)
-    except ValueError:
-        # Skip labels without valid date parts
-        continue
-
 # Sidebar for week range, week selection, and currency filter
 st.sidebar.header("🗓️ Select Week Range")
 start_date = st.sidebar.date_input("Select start date:", datetime.now())
@@ -49,9 +34,16 @@ end_date = st.sidebar.date_input("Select end date:", datetime.now())
 # Filter available weeks based on the selected date range
 selected_weeks = []
 for label in week_labels:
-    week_date = datetime.strptime(label.split()[-1], "%d/%m/%Y")
-    if start_date <= week_date <= end_date:
-        selected_weeks.append(label)
+    try:
+        # Extract the date part after the last hyphen
+        week_date_str = label.split("-")[-1].strip()
+        week_date = datetime.strptime(week_date_str, "%d/%m/%Y")
+        # Check if the date is within the selected range
+        if start_date <= week_date <= end_date:
+            selected_weeks.append(label)
+    except ValueError:
+        # Skip labels without valid date parts
+        continue
 
 selected_week_index = st.sidebar.selectbox("Choose a specific week:", list(range(len(selected_weeks))), format_func=lambda x: selected_weeks[x])
 selected_week_data = all_weeks_data[selected_week_index]
