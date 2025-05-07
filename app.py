@@ -106,7 +106,7 @@ with st.expander('Cash Outs'):
 
 # 6. Weekly Comparison
 st.header('📈 Weekly Comparison')
-# Move comparison selector here
+# Weeks selector for comparison
 comp_weeks = st.multiselect('Select Weeks to Compare', weeks, default=weeks[-2:])
 if comp_weeks:
     comp_df = fund_data[fund_data['Week'].isin(comp_weeks)]
@@ -115,7 +115,24 @@ if comp_weeks:
 else:
     st.info('Select at least one week to compare.')
 
-# 7. Full Dataset
+# Additional Relevant Charts
+st.header('📊 Additional Charts')
+# A. Cash Ins vs Cash Outs Totals for Selected Week
+st.subheader('Cash Ins vs Cash Outs Totals')
+section_totals = df_week.groupby('Section')[selected_currencies].sum().loc[['Cash Ins','Cash Outs']]
+st.bar_chart(section_totals)
+
+# B. Cash Ins Breakdown Chart
+st.subheader('Cash Ins Breakdown Chart')
+ins_breakdown = df_week[df_week['Section']=='Cash Ins'].groupby('Details')[selected_currencies].sum()
+st.bar_chart(ins_breakdown)
+
+# C. Cash Outs Breakdown Chart
+st.subheader('Cash Outs Breakdown Chart')
+outs_breakdown = df_week[df_week['Section']=='Cash Outs'].groupby('Details')[selected_currencies].sum()
+st.bar_chart(outs_breakdown)
+
+# 7. Full Dataset Full Dataset
 st.header('📁 Full Dataset')
 with st.expander('View Full Dataset'):
     st.dataframe(fund_data)
