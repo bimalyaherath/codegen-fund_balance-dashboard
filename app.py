@@ -13,39 +13,47 @@ def load_data(file_path):
     # Read the Excel file
     xls = pd.ExcelFile(file_path)
     # Extract all sheets (each representing a week)
-    all_sheets = []
+    all_sheets = {}
     for sheet in xls.sheet_names:
         df = pd.read_excel(file_path, sheet_name=sheet, header=1)
         # Rename the first column for consistency
         df.rename(columns={df.columns[0]: 'Category'}, inplace=True)
         # Strip any whitespace from column names
         df.columns = df.columns.str.strip()
-        all_sheets.append(df)
+        all_sheets[sheet] = df
     return all_sheets
 
 all_weeks_data = load_data(DATA_FILE)
 
-# Extract available weeks
-week_labels = [f"Week {i+1} - {datetime.now().strftime('%d/%m/%Y')}" for i in range(len(all_weeks_data))]
+# Extract available weeks from sheet names
+week_labels = list(all_weeks_data.keys())
 
 # Sidebar for week range, week selection, and currency filter
 st.sidebar.header("🗓️ Select Week Range")
 start_date = st.sidebar.date_input("Select start date:", datetime.now().date())
 end_date = st.sidebar.date_input("Select end date:", datetime.now().date())
 
-# Ensure the end date is not earlier than the start date
-if start_date > end_date:
-    st.sidebar.error("End date cannot be earlier than start date")
+# Filter available weeks based on the selected date range
+selected_weeks = []
+for label in week_labels:
+    # Extract the date part from the sheet name
+    try:
+        date_parts = label.split(" to ")
+        week_start_date = datetime.strptime(date_parts[0].strip(), "%B %d").replace(year=datetime.now().year).date()
+        week_end_date = datetime.strptime(date_parts[1].strip(), "%B %d").replace(year=datetime.now().year).date()
+        # Check if the date range falls within the selected range
+        if start_date <= week_end_date and week_start_date <= end_date:
+            selected_weeks.append(label)
+    except Exception as e:
+        print(f"Error parsing week label '{label}': {e}")
+        continue
+
+# Prevent empty week selection
+if selected_weeks:
+    selected_week_name = st.sidebar.selectbox("Choose a specific week:", selected_weeks)
+    selected_week_data = all_weeks_data[selected_week_name]
 else:
-    # Filter available weeks based on the selected date range
-    valid_weeks = [i for i, label in enumerate(week_labels) if start_date <= datetime.strptime(label.split('-')[-1].strip(), "%d/%m/%Y").date() <= end_date]
-    
-    # Prevent empty week selection
-    if valid_weeks:
-        selected_week_index = st.sidebar.selectbox("Choose a specific week:", valid_weeks, format_func=lambda x: week_labels[x])
-        selected_week_data = all_weeks_data[selected_week_index]
-    else:
-        st.sidebar.warning("No weeks available in the selected date range")
+    st.sidebar.warning("No weeks available in the selected date range")
 
 # Extract currency columns
 currency_columns = [col for col in selected_week_data.columns if col not in ['Category', 'Unnamed: 0']]
@@ -71,7 +79,6 @@ except Exception as e:
 
 # Main Dashboard Title
 st.title("💰 Weekly Fund Dashboard")
-selected_week_name = selected_weeks[selected_week_index]
 st.subheader(f"📅 Week: {selected_week_name}")
 
 # Weekly Summary
