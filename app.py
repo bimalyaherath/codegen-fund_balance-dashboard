@@ -3,7 +3,7 @@ import pandas as pd
 import datetime
 
 # Load the Excel file
-FILE_PATH = '/mnt/data/Fund Balance Database Format - New.xlsx'
+FILE_PATH = 'Fund Balance Database Format - New.xlsx'
 excel_file = pd.ExcelFile(FILE_PATH)
 sheet_names = excel_file.sheet_names
 
