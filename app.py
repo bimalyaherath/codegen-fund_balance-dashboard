@@ -7,11 +7,13 @@ import requests
 import json
 
 # --- Data Upload & Versioning Setup ---
-UPLOAD_DIR = '/mnt/data/uploads'
-HISTORY_FILE = '/mnt/data/upload_history.json'
+import tempfile
+# Use system temp directory for uploads to avoid permission issues
+UPLOAD_DIR = os.path.join(tempfile.gettempdir(), 'weekly_uploads')
+HISTORY_FILE = os.path.join(UPLOAD_DIR, 'upload_history.json')
+# Create upload directory if not exists
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-# Load or initialize upload history
 def load_history():
     if os.path.exists(HISTORY_FILE):
         try:
