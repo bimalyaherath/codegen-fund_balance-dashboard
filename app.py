@@ -15,9 +15,11 @@ def load_data(file_path):
     # Extract all sheets (each representing a week)
     all_sheets = []
     for sheet in xls.sheet_names:
-        df = pd.read_excel(file_path, sheet_name=sheet)
+        df = pd.read_excel(file_path, sheet_name=sheet, header=1)
         # Rename the first column for consistency
         df.rename(columns={df.columns[0]: 'Category'}, inplace=True)
+        # Strip any whitespace from column names
+        df.columns = df.columns.str.strip()
         all_sheets.append(df)
     return all_sheets
 
@@ -26,12 +28,10 @@ all_weeks_data = load_data(DATA_FILE)
 # Extract available weeks
 week_labels = [f"Week {i+1} - {datetime.now().strftime('%d/%m/%Y')}" for i in range(len(all_weeks_data))]
 
-from datetime import date
-
-# Sidebar for week range
+# Sidebar for week range, week selection, and currency filter
 st.sidebar.header("🗓️ Select Week Range")
-start_date = st.sidebar.date_input("Select start date:", date.today())
-end_date = st.sidebar.date_input("Select end date:", date.today())
+start_date = st.sidebar.date_input("Select start date:", datetime.now().date())
+end_date = st.sidebar.date_input("Select end date:", datetime.now().date())
 
 # Filter available weeks based on the selected date range
 selected_weeks = []
@@ -50,9 +50,11 @@ for label in week_labels:
 selected_week_index = st.sidebar.selectbox("Choose a specific week:", list(range(len(selected_weeks))), format_func=lambda x: selected_weeks[x])
 selected_week_data = all_weeks_data[selected_week_index]
 
+# Extract currency columns
+currency_columns = [col for col in selected_week_data.columns if col not in ['Category', 'Unnamed: 0']]
+
 # Currency filter
-currency_columns = ['LKR', 'USD', 'GBP', 'AUD', 'DKK', 'EUR', 'MXN', 'INR', 'AED', 'Total in LKR', 'Total in USD']
-selected_currencies = st.sidebar.multiselect("💱 Select Currencies", currency_columns, default=["LKR", "USD"])
+selected_currencies = st.sidebar.multiselect("💱 Select Currencies", currency_columns, default=currency_columns[:2])
 
 # Live Currency Converter
 st.sidebar.header("💸 Currency Converter")
@@ -78,34 +80,21 @@ st.subheader(f"📅 Week: {selected_week_name}")
 # Weekly Summary
 with st.expander("📌 Weekly Summary"):
     try:
-        # Extract relevant rows
         opening_bank = selected_week_data[selected_week_data["Category"] == "Bank"]
         opening_cash = selected_week_data[selected_week_data["Category"] == "Cash in Hand"]
         cash_in = selected_week_data[selected_week_data["Category"] == "Cash Ins"]
         cash_out = selected_week_data[selected_week_data["Category"] == "Cash Outs"]
-        
-        # Handle missing data gracefully
         if not opening_bank.empty and not opening_cash.empty and not cash_in.empty and not cash_out.empty:
-            # Calculate net change
-            closing_bank = opening_bank[selected_currencies].fillna(0)
-            closing_cash = opening_cash[selected_currencies].fillna(0)
-            cash_in_total = cash_in[selected_currencies].fillna(0)
-            cash_out_total = cash_out[selected_currencies].fillna(0)
-            net_change = (closing_bank.values + closing_cash.values) - cash_out_total.values
-            
-            # Prepare summary dataframe
             summary_df = pd.DataFrame({
-                "Opening Bank": closing_bank.iloc[0],
-                "Opening Cash": closing_cash.iloc[0],
-                "Cash In": cash_in_total.iloc[0],
-                "Cash Out": cash_out_total.iloc[0],
-                "Closing Bank": closing_bank.iloc[0],
-                "Closing Cash": closing_cash.iloc[0],
-                "Net Change": net_change[0]
+                "Opening Bank": opening_bank[selected_currencies].iloc[0],
+                "Opening Cash": opening_cash[selected_currencies].iloc[0],
+                "Cash In": cash_in[selected_currencies].iloc[0],
+                "Cash Out": cash_out[selected_currencies].iloc[0],
+                "Closing Bank": opening_bank[selected_currencies].iloc[0],
+                "Closing Cash": opening_cash[selected_currencies].iloc[0],
+                "Net Change": (opening_bank[selected_currencies].values + opening_cash[selected_currencies].values - cash_out[selected_currencies].values)[0]
             })
-
             st.dataframe(summary_df)
-
             # Download button
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine='openpyxl') as writer:
@@ -120,55 +109,3 @@ with st.expander("📌 Weekly Summary"):
             st.warning("⚠️ Some data is missing for the selected week. Please check the data file.")
     except KeyError as e:
         st.error(f"Data not found for selected currencies: {e}")
-
-# Opening Balances
-with st.expander("🏦 Opening Balances"):
-    for cat in ["Bank", "Cash in Hand"]:
-        row = selected_week_data[selected_week_data["Category"] == cat]
-        
-        # Check if the selected currencies exist in the dataframe
-        available_currencies = [col for col in selected_currencies if col in row.columns]
-        
-        if not row.empty and available_currencies:
-            st.write(f"**{cat}**")
-            # Only select available currencies
-            st.dataframe(row[available_currencies].T.rename(columns={row.index[0]: 'Amount'}))
-        else:
-            st.warning(f"⚠️ No matching currency columns found for '{cat}'")
-
-# Cash Ins
-with st.expander("📥 Cash Ins"):
-    cash_in_section = selected_week_data[selected_week_data["Category"] == "Cash Ins"]
-    
-    # Check if the selected currencies exist in the dataframe
-    available_currencies = [col for col in selected_currencies if col in cash_in_section.columns]
-    
-    if not cash_in_section.empty and available_currencies:
-        st.dataframe(cash_in_section[available_currencies].T.rename(columns={cash_in_section.index[0]: 'Amount'}))
-    else:
-        st.warning("⚠️ No matching currency columns found for 'Cash Ins'")
-
-# Cash Outs
-with st.expander("📤 Cash Outs"):
-    cash_out_section = selected_week_data[selected_week_data["Category"] == "Cash Outs"]
-    
-    # Check if the selected currencies exist in the dataframe
-    available_currencies = [col for col in selected_currencies if col in cash_out_section.columns]
-    
-    if not cash_out_section.empty and available_currencies:
-        st.dataframe(cash_out_section[available_currencies].T.rename(columns={cash_out_section.index[0]: 'Amount'}))
-    else:
-        st.warning("⚠️ No matching currency columns found for 'Cash Outs'")
-
-# Full Dataset Download
-with st.expander("📂 View & Download Full Dataset"):
-    st.dataframe(selected_week_data, use_container_width=True)
-    output = io.BytesIO()
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        selected_week_data.to_excel(writer, sheet_name=selected_week_name)
-    st.download_button(
-        label="📥 Download Selected Week Data as Excel",
-        data=output.getvalue(),
-        file_name=f"{selected_week_name}_Data.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
