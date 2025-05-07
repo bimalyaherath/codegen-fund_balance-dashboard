@@ -233,28 +233,43 @@ elif mode == 'Rolling Window':
     st.write(sum2)
 
 # 8. Forecasting & Trends
-import statsmodels.api as sm
+# Attempt to import statsmodels for forecasting
+try:
+    import statsmodels.api as sm
+    SM_ENABLED = True
+except ImportError:
+    SM_ENABLED = False
+
 st.header('🔮 Forecasting & Trends')
-# Moving Averages
-if 'comp_weeks' in locals() and comp_weeks:
-    dfc = fund_data[fund_data['Week'].isin(comp_weeks)].groupby('Week')[selected_currencies].sum()
+if SM_ENABLED:
+    # A. Moving Averages on Weekly Comparison
+    st.subheader('Moving Averages on Weekly Comparison')
+    if 'comp_weeks' in locals() and comp_weeks:
+        comp_df = fund_data[fund_data['Week'].isin(comp_weeks)].groupby('Week')[selected_currencies].sum()
+        for c in selected_currencies:
+            series = comp_df[c]
+            ma = series.rolling(window=3, min_periods=1).mean()
+            df_plot = pd.DataFrame({'Actual': series, 'Moving Average (3wk)': ma})
+            st.line_chart(df_plot)
+    else:
+        st.info('Select weeks above to show moving averages.')
+    # B. ARIMA Forecast for Closing Balance
+    st.subheader('ARIMA Forecast for Closing Balance')
     for c in selected_currencies:
-        s = dfc[c]; ma = s.rolling(3,min_periods=1).mean()
-        st.subheader(f'{c} Actual vs MA (3wk)')
-        st.line_chart(pd.DataFrame({'Actual': s, 'MA': ma}))
-# ARIMA Forecast
-st.subheader('ARIMA Next-Week Forecast')
-for c in selected_currencies:
-    op = fund_data[fund_data['Section']=='Bank & Cash Balances'].groupby('Week')[c].sum()
-    ins = fund_data[fund_data['Section']=='Cash Ins'].groupby('Week')[c].sum()
-    outs = fund_data[fund_data['Section']=='Cash Outs'].groupby('Week')[c].sum()
-    net = ins.sub(outs, fill_value=0); close = op.add(net, fill_value=0)
-    try:
-        mod = sm.tsa.ARIMA(close, order=(1,1,0)).fit()
-        fcast = mod.forecast(steps=1)
-        st.write(f'Next week closing {c}: {fcast.iloc[0]:.2f}')
-    except Exception as e:
-        st.warning(f'Could not forecast {c}: {e}')
+        open_vals = fund_data[fund_data['Section']=='Bank & Cash Balances'].groupby('Week')[c].sum()
+        ins_vals = fund_data[fund_data['Section']=='Cash Ins'].groupby('Week')[c].sum()
+        outs_vals = fund_data[fund_data['Section']=='Cash Outs'].groupby('Week')[c].sum()
+        net_vals = ins_vals.sub(outs_vals, fill_value=0)
+        close_vals = open_vals.add(net_vals, fill_value=0)
+        try:
+            model = sm.tsa.ARIMA(close_vals, order=(1,1,0))
+            res = model.fit()
+            fcast = res.forecast(steps=1)
+            st.write(f'Forecast next week closing balance in {c}: {fcast.iloc[0]:.2f} {c}')
+        except Exception as e:
+            st.warning(f'Could not forecast for {c}: {e}')
+else:
+    st.info('Install `statsmodels` to enable forecasting & trends')
 
 # 9. Export & Sharing
 st.header('📤 Export & Sharing')
