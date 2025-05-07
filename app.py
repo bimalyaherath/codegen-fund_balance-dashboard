@@ -42,13 +42,11 @@ if fund_data.empty:
     st.error("No weekly fund data found. Upload 'Fund_Balance_*.xlsx' files to the repo root, 'data/' or '/mnt/data'.")
     st.stop()
 
-# Sidebar settings
+# 2. Sidebar Settings
 st.sidebar.title('Dashboard Settings')
 # Week selector for main summary
 weeks = sorted(fund_data['Week'].unique())
 selected_week = st.sidebar.selectbox('Select Week', weeks)
-# Comparison weeks selector
-comp_weeks = st.sidebar.multiselect('Select Weeks to Compare', weeks, default=weeks[-2:])
 # Currency multiselect
 currencies = ['LKR','USD','GBP','AUD','DKK','EUR','MXN','INR','AED']
 selected_currencies = st.sidebar.multiselect('Select Currencies', currencies, default=['LKR'])
@@ -56,7 +54,7 @@ if not selected_currencies:
     st.sidebar.error('Select at least one currency')
     st.stop()
 
-# Live currency converter
+# Live Currency Converter
 def get_rate(base: str, symbol: str) -> float:
     resp = requests.get('https://api.exchangerate.host/latest', params={'base': base, 'symbols': symbol}, timeout=5)
     data = resp.json()
@@ -74,30 +72,28 @@ else:
     st.sidebar.write(f'1 {from_cur} = {rate:.4f} {to_cur}')
     st.sidebar.write(f'{amount} {from_cur} = {converted:.2f} {to_cur}')
 
-# Main header
-dt_today = dt.date.today()
+# 3. Main Dashboard Header
 try:
     start_str, end_str = selected_week.split('_to_')
-    start_dt = dt.datetime.strptime(start_str, '%B_%d').replace(year=dt_today.year).date()
-    end_dt = dt.datetime.strptime(end_str, '%B_%d').replace(year=dt_today.year).date()
+    start_dt = dt.datetime.strptime(start_str, '%B_%d').replace(year=dt.date.today().year).date()
+    end_dt = dt.datetime.strptime(end_str, '%B_%d').replace(year=dt.date.today().year).date()
     subtitle = f"{selected_week.replace('_',' ')} ({start_dt} to {end_dt})"
 except:
     subtitle = selected_week.replace('_',' ')
-
 st.title('📊 Weekly Fund Dashboard')
 st.subheader(subtitle)
 
 # Filter for selected week
 df_week = fund_data[fund_data['Week'] == selected_week]
 
-# Weekly Summary
+# 4. Weekly Summary
 st.header('🔖 Weekly Summary')
 summary = df_week.groupby('Section')[selected_currencies].sum().reset_index()
 summary.columns = ['Category'] + [f'Total {cur}' for cur in selected_currencies]
 st.table(summary)
 st.download_button('Download Weekly Summary', summary.to_csv(index=False), file_name=f"{selected_week}_Weekly_Summary.csv", mime='text/csv')
 
-# Cash Ins & Outs Breakdown
+# 5. Cash Ins & Cash Outs Breakdown
 st.header('📂 Cash Ins & Outs Breakdown')
 with st.expander('Cash Ins'):
     ins = df_week[df_week['Section']=='Cash Ins'][['Details'] + selected_currencies]
@@ -108,8 +104,10 @@ with st.expander('Cash Outs'):
     outs.columns = ['Category'] + selected_currencies
     st.table(outs)
 
-# Weekly Comparison Chart
+# 6. Weekly Comparison
 st.header('📈 Weekly Comparison')
+# Move comparison selector here
+comp_weeks = st.multiselect('Select Weeks to Compare', weeks, default=weeks[-2:])
 if comp_weeks:
     comp_df = fund_data[fund_data['Week'].isin(comp_weeks)]
     comp_summary = comp_df.groupby('Week')[selected_currencies].sum()
@@ -117,7 +115,7 @@ if comp_weeks:
 else:
     st.info('Select at least one week to compare.')
 
-# Full Dataset
+# 7. Full Dataset
 st.header('📁 Full Dataset')
 with st.expander('View Full Dataset'):
     st.dataframe(fund_data)
