@@ -25,10 +25,12 @@ currencies = ["LKR", "USD", "GBP", "AUD", "DKK", "EUR", "MXN", "INR", "AED"]
 selected_currency = st.sidebar.selectbox("Select Currency", currencies)
 
 # Currency Converter
+st.sidebar.subheader("Currency Converter")
 conversion_rate = st.sidebar.number_input(f"Enter current exchange rate for {selected_currency} to LKR:", min_value=0.0, value=1.0)
+st.sidebar.write("Note: Past fund values were calculated based on historical exchange rates.")
 
-# Check for the correct amount column based on selected currency
-if selected_currency == 'LKR':
+# Add a converted amount column based on the selected currency
+if selected_currency == "LKR":
     df["Converted Amount"] = df["Total in LKR"]
 else:
     if selected_currency in df.columns:
@@ -36,14 +38,28 @@ else:
     else:
         st.sidebar.error(f"No data available for {selected_currency} in this sheet.")
 
-st.sidebar.write("Note: Past fund values were calculated based on historical exchange rates.")
-
 # Main Dashboard
 st.title("Weekly Fund Dashboard")
 st.subheader(f"Data for {selected_week}")
 
 # Weekly Summary Download
+st.subheader("Weekly Summary")
 st.download_button("Download Weekly Summary", df.to_csv(index=False).encode('utf-8'), file_name=f"{selected_week}_summary.csv", mime='text/csv')
+
+# Opening Balances
+st.subheader("Opening Balances")
+opening_balances = df[df["Details"].str.contains("Opening Balance", case=False, na=False)]
+st.dataframe(opening_balances)
+
+# Cash Ins
+st.subheader("Cash Ins During the Week")
+cash_ins = df[df["Details"].str.contains("Cash In", case=False, na=False)]
+st.dataframe(cash_ins)
+
+# Cash Outs
+st.subheader("Cash Outs During the Week")
+cash_outs = df[df["Details"].str.contains("Cash Out", case=False, na=False)]
+st.dataframe(cash_outs)
 
 # Full Dataset
 st.subheader("Full Dataset for Selected Week")
