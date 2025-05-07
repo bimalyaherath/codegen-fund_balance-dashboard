@@ -12,7 +12,6 @@ def load_fund_data():
              + glob.glob('Fund_Balance_*.xlsx')
     all_weeks = []
     for file in paths:
-        # Derive week label from filename
         base = os.path.basename(file).replace('Fund_Balance_','').replace('.xlsx','')
         week_label = base
         try:
@@ -20,11 +19,10 @@ def load_fund_data():
         except Exception as e:
             st.warning(f"Could not read {file}: {e}")
             continue
-        # Identify section headers
         mask = df['Details'].str.contains('Bank & Cash Balances|Cash Transactions During the Week|Cash Ins|Cash Outs', na=False)
         idx = df[mask].index.tolist()
         if not idx:
-            st.warning(f"No valid sections found in {file}")
+            st.warning(f"No valid sections in {file}")
             continue
         parts = []
         for i, start in enumerate(idx):
@@ -40,18 +38,17 @@ def load_fund_data():
         return pd.DataFrame()
     return pd.concat(all_weeks, ignore_index=True)
 
-# Load data
 fund_data = load_fund_data()
 if fund_data.empty:
     st.error("No weekly fund data found. Upload 'Fund_Balance_*.xlsx' files to the repo root, 'data/' or '/mnt/data'.")
     st.stop()
 
-# 2. Sidebar: Week and Currency Selection
+# 2. Sidebar: Settings
 st.sidebar.title('Dashboard Settings')
+
 # A. Week selector
 weeks = sorted(fund_data['Week'].unique())
 selected_week = st.sidebar.selectbox('Select Week', weeks)
-# Parse dates for display
 try:
     start_str, end_str = selected_week.split('_to_')
     start_dt = dt.datetime.strptime(start_str, '%B_%d').replace(year=dt.date.today().year)
@@ -61,9 +58,12 @@ except ValueError:
 if end_dt and end_dt.date() > dt.date.today():
     st.sidebar.error('⚠️ Selected week is in the future!')
 
-# B. Currency filter
+# B. Currency multiselect
 currencies = ['LKR','USD','GBP','AUD','DKK','EUR','MXN','INR','AED']
-selected_currency = st.sidebar.selectbox('Currency', currencies)
+selected_currencies = st.sidebar.multiselect('Select Currencies', currencies, default=['LKR'])
+if not selected_currencies:
+    st.sidebar.error('Select at least one currency')
+    st.stop()
 
 # C. Currency converter
 st.sidebar.header('Currency Converter')
@@ -75,21 +75,22 @@ converted = amount * rate
 st.sidebar.write(f'{amount} {from_cur} = {converted:.2f} {to_cur}')
 st.sidebar.info('Note: Historical fund values used the exchange rates of that period.')
 
-# 3. Main Dashboard Title
+# 3. Main Title
 st.title('📊 Weekly Fund Dashboard')
-subtitle = f'{selected_week.replace("_", " ")}'
+subtitle = selected_week.replace('_', ' ')
 if start_dt and end_dt:
     subtitle += f' ({start_dt.date()} to {end_dt.date()})'
 st.subheader(subtitle)
 
-# Filter data for selected week
+# Filter data by week
 week_df = fund_data[fund_data['Week'] == selected_week]
 
 # 4. Weekly Summary
 st.header('🔖 Weekly Summary')
-# Aggregate totals by section
-summary_df = week_df.groupby('Section')[selected_currency].sum().reset_index()
-summary_df.columns = ['Category', f'Total {selected_currency}']
+summary_df = week_df.groupby('Section')[selected_currencies].sum().reset_index()
+# Rename for display
+col_names = ['Category'] + [f'Total {cur}' for cur in selected_currencies]
+summary_df.columns = col_names
 st.table(summary_df)
 st.download_button(
     label='Download Weekly Summary',
@@ -100,23 +101,23 @@ st.download_button(
 
 # 5. Detailed Breakdown
 st.header('📂 Detailed Breakdown')
-sections = ['Bank & Cash Balances','Cash Ins','Cash Outs']
-for section in sections:
+for section in ['Bank & Cash Balances','Cash Ins','Cash Outs']:
     sec_df = week_df[week_df['Section'].str.contains(section, na=False)]
     with st.expander(section):
-        display_df = sec_df[['Details', selected_currency, 'Total in LKR', 'Total in USD']].rename(columns={'Details':'Category'})
+        cols = ['Details'] + selected_currencies + ['Total in LKR', 'Total in USD']
+        display_df = sec_df[cols].rename(columns={'Details':'Category'})
         st.table(display_df)
 
 # 6. Charts & Graphs
 st.header('📈 Charts & Graphs')
 # Cash Ins Trend
-ins_trend = fund_data[fund_data['Section']=='Cash Ins'].groupby('Week')[selected_currency].sum()
-st.line_chart(ins_trend.rename('Cash Ins'))
+ins_trend_df = fund_data[fund_data['Section']=='Cash Ins'].groupby('Week')[selected_currencies].sum()
+st.line_chart(ins_trend_df)
 # Cash Outs Trend
-outs_trend = fund_data[fund_data['Section']=='Cash Outs'].groupby('Week')[selected_currency].sum()
-st.line_chart(outs_trend.rename('Cash Outs'))
-# Bar Chart Comparison for Selected Week
-chart_df = week_df.groupby('Section')[selected_currency].sum().reset_index()
+outs_trend_df = fund_data[fund_data['Section']=='Cash Outs'].groupby('Week')[selected_currencies].sum()
+st.line_chart(outs_trend_df)
+# Bar Chart for Selected Week
+chart_df = week_df.groupby('Section')[selected_currencies].sum().reset_index()
 st.bar_chart(chart_df.set_index('Section'))
 
 # 7. Full Dataset
