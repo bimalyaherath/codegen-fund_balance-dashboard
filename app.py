@@ -4,22 +4,74 @@ import datetime as dt
 import glob
 import os
 import requests
+import json
 
-# 1. Load and clean weekly Excel files
+# --- Data Upload & Versioning Setup ---
+UPLOAD_DIR = '/mnt/data/uploads'
+HISTORY_FILE = '/mnt/data/upload_history.json'
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+# Load or initialize upload history
+def load_history():
+    if os.path.exists(HISTORY_FILE):
+        try:
+            return json.load(open(HISTORY_FILE))
+        except:
+            return []
+    return []
+
+history = load_history()
+
+# File uploader for new weekly Excel files
+uploaded_files = st.sidebar.file_uploader(
+    "Upload Weekly Excel Files (versioned)",
+    type=['xlsx'], accept_multiple_files=True
+)
+if uploaded_files:
+    timestamp = dt.datetime.now().isoformat()
+    saved = []
+    for f in uploaded_files:
+        save_name = f"{timestamp}_{f.name}"
+        with open(os.path.join(UPLOAD_DIR, save_name), 'wb') as out:
+            out.write(f.getbuffer())
+        saved.append(save_name)
+    history.append({"timestamp": timestamp, "files": saved})
+    with open(HISTORY_FILE, 'w') as hist_f:
+        json.dump(history, hist_f)
+    st.sidebar.success(f"Uploaded {len(saved)} files at {timestamp}")
+
+# Version selection
+version_labels = [entry['timestamp'] for entry in history]
+version_choice = st.sidebar.selectbox(
+    'Select Data Version', ['Latest'] + version_labels
+)
+if version_choice == 'Latest':
+    version_files = os.listdir(UPLOAD_DIR)
+else:
+    version_files = next(e['files'] for e in history if e['timestamp'] == version_choice)
+
+# --- Data Loading Function ---
 @st.cache_data
-def load_fund_data():
-    paths = glob.glob('data/Fund_Balance_*.xlsx') \
-             + glob.glob('/mnt/data/Fund_Balance_*.xlsx') \
-             + glob.glob('Fund_Balance_*.xlsx')
+def load_fund_data(version_files):
+    # Static files
+    static_paths = glob.glob('data/Fund_Balance_*.xlsx') \
+                   + glob.glob('/mnt/data/Fund_Balance_*.xlsx') \
+                   + glob.glob('Fund_Balance_*.xlsx')
+    # Uploaded versioned files
+    upload_paths = [os.path.join(UPLOAD_DIR, f) for f in version_files]
+    all_paths = static_paths + upload_paths
     all_weeks = []
-    for file in paths:
+    for file in all_paths:
         week_label = os.path.basename(file).replace('Fund_Balance_','').replace('.xlsx','')
         try:
             df = pd.read_excel(file)
         except Exception as e:
             st.warning(f"Could not read {file}: {e}")
             continue
-        mask = df['Details'].str.contains('Bank & Cash Balances|Cash Transactions During the Week|Cash Ins|Cash Outs', na=False)
+        mask = df['Details'].str.contains(
+            'Bank & Cash Balances|Cash Transactions During the Week|Cash Ins|Cash Outs',
+            na=False
+        )
         idx = df[mask].index.tolist()
         if not idx:
             st.warning(f"No valid sections in {file}")
@@ -36,12 +88,13 @@ def load_fund_data():
         all_weeks.append(week_df)
     return pd.concat(all_weeks, ignore_index=True) if all_weeks else pd.DataFrame()
 
-fund_data = load_fund_data()
+# Load dataset based on version selection
+fund_data = load_fund_data(version_files)
 if fund_data.empty:
-    st.error("No weekly fund data found. Upload 'Fund_Balance_*.xlsx' files to the repo root, 'data/' or '/mnt/data'.")
+    st.error("No fund data found for selected version.")
     st.stop()
 
-# 2. Helper to parse week start date
+# --- Helper Functions ---
 current_year = dt.date.today().year
 
 def parse_week_start(w):
@@ -51,18 +104,18 @@ def parse_week_start(w):
     except:
         return dt.datetime.min
 
-# Chronologically sorted weeks
+# Chronological weeks
 weeks = sorted(fund_data['Week'].unique(), key=parse_week_start)
-week_start_dates = [parse_week_start(w).date() for w in weeks]
-min_date, max_date = min(week_start_dates), max(week_start_dates)
 
-# 3. Sidebar Settings
+# --- Sidebar Filters ---
 st.sidebar.title('Dashboard Settings')
 selected_week = st.sidebar.selectbox('Select Week', weeks)
 
 # Currency multiselect
 currencies = ['LKR','USD','GBP','AUD','DKK','EUR','MXN','INR','AED']
-selected_currencies = st.sidebar.multiselect('Select Currencies', currencies, default=[currencies[0]])
+selected_currencies = st.sidebar.multiselect(
+    'Select Currencies', currencies, default=[currencies[0]]
+)
 if not selected_currencies:
     st.sidebar.error('Select at least one currency')
     st.stop()
@@ -89,7 +142,7 @@ else:
     st.sidebar.write(f'1 {from_cur} = {rate:.4f} {to_cur}')
     st.sidebar.write(f'{amount} {from_cur} = {converted:.2f} {to_cur}')
 
-# 4. Main Dashboard Header
+# --- Main Dashboard ---
 try:
     sd = parse_week_start(selected_week).date()
     ed = sd + dt.timedelta(days=6)
@@ -102,14 +155,14 @@ st.subheader(subtitle)
 # Filter for selected week
 df_week = fund_data[fund_data['Week'] == selected_week]
 
-# 5. Weekly Summary
+# 1. Weekly Summary
 st.header('🔖 Weekly Summary')
 summary = df_week.groupby('Section')[selected_currencies].sum().reset_index()
 summary.columns = ['Category'] + [f'Total {cur}' for cur in selected_currencies]
 st.table(summary)
 st.download_button('Download Weekly Summary', summary.to_csv(index=False), file_name=f"{selected_week}_Weekly_Summary.csv", mime='text/csv')
 
-# 6. Cash Ins & Outs Breakdown
+# 2. Cash Ins & Outs Breakdown
 st.header('📂 Cash Ins & Outs Breakdown')
 with st.expander('Cash Ins'):
     ins = df_week[df_week['Section']=='Cash Ins'][['Details'] + selected_currencies]
@@ -120,7 +173,7 @@ with st.expander('Cash Outs'):
     outs.columns = ['Category'] + selected_currencies
     st.table(outs)
 
-# 7. Weekly Comparison
+# 3. Weekly Comparison
 st.header('📈 Weekly Comparison')
 comp_weeks = st.multiselect('Select Weeks to Compare', weeks, default=weeks[-2:])
 if comp_weeks:
@@ -130,14 +183,12 @@ if comp_weeks:
 else:
     st.info('Select at least one week to compare.')
 
-# 8. Additional Charts
+# 4. Additional Charts
 st.header('📊 Additional Charts')
-# A. Cash Ins vs Cash Outs Totals for Selected Week
-st.subheader('Cash Ins vs Cash Outs Totals')
 sec_totals = df_week.groupby('Section')[selected_currencies].sum().loc[['Cash Ins','Cash Outs']]
 st.bar_chart(sec_totals)
 
-# 9. Net Cash-Flow & Balances
+# 5. Net Cash-Flow & Balances
 st.header('💰 Net Cash-Flow & Balances')
 for cur in selected_currencies:
     open_vals = fund_data[fund_data['Section']=='Bank & Cash Balances'].groupby('Week')[cur].sum()
@@ -153,14 +204,11 @@ for cur in selected_currencies:
     st.subheader(f'{cur} Balances Over Time')
     st.line_chart(stats)
 
-# 10. Alerts & Thresholds
+# 6. Alerts & Thresholds
 st.header('🚨 Alerts & Thresholds')
 thresholds = {}
 for cur in selected_currencies:
-    thresholds[cur] = st.number_input(
-        f'Threshold for net cash change in {cur}',
-        value=0.0, step=1.0, key=f'th_{cur}'
-    )
+    thresholds[cur] = st.number_input(f'Threshold for net cash change in {cur}', value=0.0, step=1.0, key=f'th_{cur}')
 ins_week = fund_data[(fund_data['Week']==selected_week) & (fund_data['Section']=='Cash Ins')].groupby('Week')[selected_currencies].sum().reindex([selected_week], fill_value=0)
 outs_week = fund_data[(fund_data['Week']==selected_week) & (fund_data['Section']=='Cash Outs')].groupby('Week')[selected_currencies].sum().reindex([selected_week], fill_value=0)
 net_week = ins_week - outs_week
@@ -172,10 +220,10 @@ for cur in selected_currencies:
     else:
         st.success(f'Net cash change for {selected_week} in {cur} is {net_val:.2f}, meets threshold {th}.')
 
-# 11. Date-Range & Rolling Periods
+# 7. Date-Range & Rolling Periods
 st.header('📅 Date Range & Rolling Periods')
 mode = st.radio('Select Mode:', ['Custom Date Range', 'Rolling Window'])
-
+min_date, max_date = min(parse_week_start(w).date() for w in weeks), max(parse_week_start(w).date() for w in weeks)
 if mode == 'Custom Date Range':
     drange = st.date_input('Date range:', [min_date, max_date], min_value=min_date, max_value=max_date)
     if len(drange) == 2:
@@ -188,8 +236,7 @@ if mode == 'Custom Date Range':
             st.write(pr_sum)
         else:
             st.info('No data in this date range.')
-
-if mode == 'Rolling Window':
+elif mode == 'Rolling Window':
     rw = st.selectbox('Window Type:', ['Last N Weeks', 'Month-to-Date', 'Quarter-to-Date'])
     if rw == 'Last N Weeks':
         n = st.number_input('Number of weeks:', min_value=1, max_value=len(weeks), value=4)
@@ -208,48 +255,6 @@ if mode == 'Rolling Window':
     pr_sum.columns = ['Category'] + [f'Total {cur}' for cur in selected_currencies]
     st.write(pr_sum)
 
-# 12. Forecasting & Trends
-st.header('🔮 Forecasting & Trends')
-# A. Moving Averages on Weekly Comparison
-st.subheader('Moving Averages on Weekly Comparison')
-if comp_weeks:
-    comp_df = fund_data[fund_data['Week'].isin(comp_weeks)]
-    comp_summary = comp_df.groupby('Week')[selected_currencies].sum()
-    for cur in selected_currencies:
-        series = comp_summary[cur]
-        # 3-week moving average
-        ma = series.rolling(window=3, min_periods=1).mean()
-        df_plot = pd.DataFrame({
-            'Actual': series,
-            'Moving Average (3wk)': ma
-        })
-        st.line_chart(df_plot)
-else:
-    st.info('Select weeks above to show moving averages.')
-
-# B. ARIMA Forecast for Closing Balance
-st.subheader('ARIMA Forecast for Closing Balance')
-from statsmodels.tsa.arima.model import ARIMA
-for cur in selected_currencies:
-    # Prepare closing balance series for all weeks
-    open_vals = fund_data[fund_data['Section']=='Bank & Cash Balances'].groupby('Week')[cur].sum()
-    ins_vals = fund_data[fund_data['Section']=='Cash Ins'].groupby('Week')[cur].sum()
-    outs_vals = fund_data[fund_data['Section']=='Cash Outs'].groupby('Week')[cur].sum()
-    net_vals = ins_vals.sub(outs_vals, fill_value=0)
-    close_vals = open_vals.add(net_vals, fill_value=0)
-    try:
-        model = ARIMA(close_vals, order=(1,1,0))
-        res = model.fit()
-        fcast = res.forecast(steps=1)
-        st.write(f'Forecast next week closing balance in {cur}: {fcast.iloc[0]:.2f} {cur}')
-    except Exception as e:
-        st.warning(f'Could not forecast for {cur}: {e}')
-
-# 13. Full Dataset
-st.header('📁 Full Dataset')
-with st.expander('View Full Dataset'):
-    st.dataframe(fund_data)
-    st.download_button('Download Full Dataset', fund_data.to_csv(index=False), file_name='Full_Weekly_Fund_Data.csv', mime='text/csv')
-
+# Footer
 st.write('---')
 st.caption('Created with ❤️ using Streamlit & GitHub')
