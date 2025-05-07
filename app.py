@@ -41,9 +41,7 @@ if fund_data.empty:
     st.error("No weekly fund data found. Upload 'Fund_Balance_*.xlsx' files to the repo root, 'data/' or '/mnt/data'.")
     st.stop()
 
-# 2. Sidebar Settings
-st.sidebar.title('Dashboard Settings')
-# Chronological week sorting
+# 2. Helper to parse week start date
 current_year = dt.date.today().year
 
 def parse_week_start(w):
@@ -53,7 +51,13 @@ def parse_week_start(w):
     except:
         return dt.datetime.min
 
+# Chronologically sorted weeks
 weeks = sorted(fund_data['Week'].unique(), key=parse_week_start)
+week_start_dates = [parse_week_start(w).date() for w in weeks]
+min_date, max_date = min(week_start_dates), max(week_start_dates)
+
+# 3. Sidebar Settings
+st.sidebar.title('Dashboard Settings')
 selected_week = st.sidebar.selectbox('Select Week', weeks)
 
 # Currency multiselect
@@ -85,31 +89,27 @@ else:
     st.sidebar.write(f'1 {from_cur} = {rate:.4f} {to_cur}')
     st.sidebar.write(f'{amount} {from_cur} = {converted:.2f} {to_cur}')
 
-# 3. Main Dashboard Header
+# 4. Main Dashboard Header
 try:
-    start_str, end_str = selected_week.split('_to_')
-    sd = dt.datetime.strptime(start_str, '%B_%d').replace(year=current_year).date()
-    ed = dt.datetime.strptime(end_str, '%B_%d').replace(year=current_year).date()
+    sd = parse_week_start(selected_week).date()
+    ed = sd + dt.timedelta(days=6)
     subtitle = f"{selected_week.replace('_',' ')} ({sd} to {ed})"
 except:
     subtitle = selected_week.replace('_',' ')
 st.title('📊 Weekly Fund Dashboard')
 st.subheader(subtitle)
 
-# Filter data for selected week
+# Filter for selected week
 df_week = fund_data[fund_data['Week'] == selected_week]
 
-# 4. Weekly Summary
+# 5. Weekly Summary
 st.header('🔖 Weekly Summary')
 summary = df_week.groupby('Section')[selected_currencies].sum().reset_index()
 summary.columns = ['Category'] + [f'Total {cur}' for cur in selected_currencies]
 st.table(summary)
-st.download_button(
-    'Download Weekly Summary', summary.to_csv(index=False),
-    file_name=f"{selected_week}_Weekly_Summary.csv", mime='text/csv'
-)
+st.download_button('Download Weekly Summary', summary.to_csv(index=False), file_name=f"{selected_week}_Weekly_Summary.csv", mime='text/csv')
 
-# 5. Cash Ins & Outs Breakdown
+# 6. Cash Ins & Outs Breakdown
 st.header('📂 Cash Ins & Outs Breakdown')
 with st.expander('Cash Ins'):
     ins = df_week[df_week['Section']=='Cash Ins'][['Details'] + selected_currencies]
@@ -120,7 +120,7 @@ with st.expander('Cash Outs'):
     outs.columns = ['Category'] + selected_currencies
     st.table(outs)
 
-# 6. Weekly Comparison
+# 7. Weekly Comparison
 st.header('📈 Weekly Comparison')
 comp_weeks = st.multiselect('Select Weeks to Compare', weeks, default=weeks[-2:])
 if comp_weeks:
@@ -130,14 +130,14 @@ if comp_weeks:
 else:
     st.info('Select at least one week to compare.')
 
-# 7. Additional Charts
+# 8. Additional Charts
 st.header('📊 Additional Charts')
-# Cash Ins vs Cash Outs Totals for Selected Week
+# A. Cash Ins vs Cash Outs Totals for Selected Week
 st.subheader('Cash Ins vs Cash Outs Totals')
 sec_totals = df_week.groupby('Section')[selected_currencies].sum().loc[['Cash Ins','Cash Outs']]
 st.bar_chart(sec_totals)
 
-# 8. Net Cash-Flow & Balances
+# 9. Net Cash-Flow & Balances
 st.header('💰 Net Cash-Flow & Balances')
 for cur in selected_currencies:
     open_vals = fund_data[fund_data['Section']=='Bank & Cash Balances'].groupby('Week')[cur].sum()
@@ -153,39 +153,66 @@ for cur in selected_currencies:
     st.subheader(f'{cur} Balances Over Time')
     st.line_chart(stats)
 
-# 9. Alerts & Thresholds
+# 10. Alerts & Thresholds
 st.header('🚨 Alerts & Thresholds')
-# Input thresholds per currency
 thresholds = {}
 for cur in selected_currencies:
     thresholds[cur] = st.number_input(
         f'Threshold for net cash change in {cur}',
-        min_value=None, value=0.0, step=1.0, key=f'th_{cur}'
+        value=0.0, step=1.0, key=f'th_{cur}'
     )
-# Calculate net for selected week
-ins_week = fund_data[(fund_data['Week']==selected_week) & (fund_data['Section']=='Cash Ins')].groupby('Week')[selected_currencies].sum()
-outs_week = fund_data[(fund_data['Week']==selected_week) & (fund_data['Section']=='Cash Outs')].groupby('Week')[selected_currencies].sum()
-# Ensure we have values
-ins_week = ins_week.reindex([selected_week]).fillna(0)
-outs_week = outs_week.reindex([selected_week]).fillna(0)
+ins_week = fund_data[(fund_data['Week']==selected_week) & (fund_data['Section']=='Cash Ins')].groupby('Week')[selected_currencies].sum().reindex([selected_week], fill_value=0)
+outs_week = fund_data[(fund_data['Week']==selected_week) & (fund_data['Section']=='Cash Outs')].groupby('Week')[selected_currencies].sum().reindex([selected_week], fill_value=0)
 net_week = ins_week - outs_week
-# Show alerts
 for cur in selected_currencies:
     net_val = float(net_week[cur])
     th = thresholds[cur]
     if net_val < th:
-        st.error(f'Alert: Net cash change for {selected_week} in {cur} is {net_val:.2f}, below threshold {th}')
+        st.error(f'Alert: Net cash change for {selected_week} in {cur} is {net_val:.2f}, below threshold {th}.')
     else:
-        st.success(f'Net cash change for {selected_week} in {cur} is {net_val:.2f}, meets threshold {th}')
+        st.success(f'Net cash change for {selected_week} in {cur} is {net_val:.2f}, meets threshold {th}.')
 
-# 10. Full Dataset
+# 11. Date-Range & Rolling Periods
+st.header('📅 Date Range & Rolling Periods')
+mode = st.radio('Select Mode:', ['Custom Date Range', 'Rolling Window'])
+
+if mode == 'Custom Date Range':
+    drange = st.date_input('Date range:', [min_date, max_date], min_value=min_date, max_value=max_date)
+    if len(drange) == 2:
+        start_d, end_d = drange
+        period_weeks = [w for w in weeks if start_d <= parse_week_start(w).date() <= end_d]
+        if period_weeks:
+            pr_df = fund_data[fund_data['Week'].isin(period_weeks)]
+            pr_sum = pr_df.groupby('Section')[selected_currencies].sum().reset_index()
+            pr_sum.columns = ['Category'] + [f'Total {cur}' for cur in selected_currencies]
+            st.write(pr_sum)
+        else:
+            st.info('No data in this date range.')
+
+if mode == 'Rolling Window':
+    rw = st.selectbox('Window Type:', ['Last N Weeks', 'Month-to-Date', 'Quarter-to-Date'])
+    if rw == 'Last N Weeks':
+        n = st.number_input('Number of weeks:', min_value=1, max_value=len(weeks), value=4)
+        rw_weeks = weeks[-n:]
+    elif rw == 'Month-to-Date':
+        today = dt.date.today()
+        start_m = today.replace(day=1)
+        rw_weeks = [w for w in weeks if start_m <= parse_week_start(w).date() <= today]
+    else:
+        today = dt.date.today()
+        q = (today.month - 1) // 3
+        start_q = dt.date(today.year, q*3+1, 1)
+        rw_weeks = [w for w in weeks if start_q <= parse_week_start(w).date() <= today]
+    pr_df = fund_data[fund_data['Week'].isin(rw_weeks)]
+    pr_sum = pr_df.groupby('Section')[selected_currencies].sum().reset_index()
+    pr_sum.columns = ['Category'] + [f'Total {cur}' for cur in selected_currencies]
+    st.write(pr_sum)
+
+# 12. Full Dataset
 st.header('📁 Full Dataset')
 with st.expander('View Full Dataset'):
     st.dataframe(fund_data)
-    st.download_button(
-        'Download Full Dataset', fund_data.to_csv(index=False),
-        file_name='Full_Weekly_Fund_Data.csv', mime='text/csv'
-    )
+    st.download_button('Download Full Dataset', fund_data.to_csv(index=False), file_name='Full_Weekly_Fund_Data.csv', mime='text/csv')
 
 # Footer
 st.write('---')
