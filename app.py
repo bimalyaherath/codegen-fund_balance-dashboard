@@ -36,8 +36,11 @@ date_range = st.sidebar.date_input(
     max_value=max(week_dates)
 )
 
-# Separate start and end dates
-start_date, end_date = date_range
+# Unpack the tuple
+if isinstance(date_range, tuple):
+    start_date, end_date = date_range
+else:
+    start_date = end_date = date_range
 
 # Filter weeks based on selected range
 selected_weeks = [label for label, date in zip(week_labels, week_dates) if start_date <= date <= end_date]
