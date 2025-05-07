@@ -6,3 +6,6 @@ seaborn
 requests
 openpyxl
 xlrd
+statsmodels
+fpdf
+python-pptx
