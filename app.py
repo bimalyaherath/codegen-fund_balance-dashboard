@@ -7,7 +7,7 @@ FILE_PATH = '/mnt/data/Fund Balance Database Format - New.xlsx'
 excel_file = pd.ExcelFile(FILE_PATH)
 sheet_names = excel_file.sheet_names
 
-# Extract available date ranges
+# Extract available date ranges for the sidebar
 week_ranges = [sheet.replace(' to ', ' - ') for sheet in sheet_names]
 
 # Sidebar Configuration
@@ -20,6 +20,10 @@ selected_week = st.sidebar.selectbox("Select Week Range", week_ranges)
 selected_sheet = selected_week.replace(' - ', ' to ')
 df = pd.read_excel(FILE_PATH, sheet_name=selected_sheet)
 
+# Remove empty rows and columns
+df.dropna(how='all', inplace=True)
+df.dropna(axis=1, how='all', inplace=True)
+
 # Currency Filter
 currencies = ["LKR", "USD", "GBP", "AUD", "DKK", "EUR", "MXN", "INR", "AED"]
 selected_currency = st.sidebar.selectbox("Select Currency", currencies)
@@ -29,9 +33,11 @@ st.sidebar.subheader("Currency Converter")
 conversion_rate = st.sidebar.number_input(f"Enter current exchange rate for {selected_currency} to LKR:", min_value=0.0, value=1.0)
 st.sidebar.write("Note: Past fund values were calculated based on historical exchange rates.")
 
-# Add a converted amount column based on the selected currency
+# Convert amounts based on selected currency
 if selected_currency == "LKR":
     df["Converted Amount"] = df["Total in LKR"]
+elif selected_currency == "USD":
+    df["Converted Amount"] = df["Total in USD"] * conversion_rate
 else:
     if selected_currency in df.columns:
         df["Converted Amount"] = df[selected_currency] * conversion_rate
