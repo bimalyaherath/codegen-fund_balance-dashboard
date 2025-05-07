@@ -139,14 +139,26 @@ with st.expander("🏦 Opening Balances"):
 # Cash Ins
 with st.expander("📥 Cash Ins"):
     cash_in_section = selected_week_data[selected_week_data["Category"] == "Cash Ins"]
-    if not cash_in_section.empty:
-        st.dataframe(cash_in_section[selected_currencies].T.rename(columns={cash_in_section.index[0]: 'Amount'}))
+    
+    # Check if the selected currencies exist in the dataframe
+    available_currencies = [col for col in selected_currencies if col in cash_in_section.columns]
+    
+    if not cash_in_section.empty and available_currencies:
+        st.dataframe(cash_in_section[available_currencies].T.rename(columns={cash_in_section.index[0]: 'Amount'}))
+    else:
+        st.warning("⚠️ No matching currency columns found for 'Cash Ins'")
 
 # Cash Outs
 with st.expander("📤 Cash Outs"):
     cash_out_section = selected_week_data[selected_week_data["Category"] == "Cash Outs"]
-    if not cash_out_section.empty:
-        st.dataframe(cash_out_section[selected_currencies].T.rename(columns={cash_out_section.index[0]: 'Amount'}))
+    
+    # Check if the selected currencies exist in the dataframe
+    available_currencies = [col for col in selected_currencies if col in cash_out_section.columns]
+    
+    if not cash_out_section.empty and available_currencies:
+        st.dataframe(cash_out_section[available_currencies].T.rename(columns={cash_out_section.index[0]: 'Amount'}))
+    else:
+        st.warning("⚠️ No matching currency columns found for 'Cash Outs'")
 
 # Full Dataset Download
 with st.expander("📂 View & Download Full Dataset"):
