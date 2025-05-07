@@ -125,9 +125,16 @@ with st.expander("📌 Weekly Summary"):
 with st.expander("🏦 Opening Balances"):
     for cat in ["Bank", "Cash in Hand"]:
         row = selected_week_data[selected_week_data["Category"] == cat]
-        if not row.empty:
+        
+        # Check if the selected currencies exist in the dataframe
+        available_currencies = [col for col in selected_currencies if col in row.columns]
+        
+        if not row.empty and available_currencies:
             st.write(f"**{cat}**")
-            st.dataframe(row[selected_currencies].T.rename(columns={row.index[0]: 'Amount'}))
+            # Only select available currencies
+            st.dataframe(row[available_currencies].T.rename(columns={row.index[0]: 'Amount'}))
+        else:
+            st.warning(f"⚠️ No matching currency columns found for '{cat}'")
 
 # Cash Ins
 with st.expander("📥 Cash Ins"):
