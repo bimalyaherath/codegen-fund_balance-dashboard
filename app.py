@@ -4,6 +4,7 @@ import plotly.express as px
 from datetime import datetime
 import io
 import requests
+import calendar
 
 # Load the new data file
 DATA_FILE = 'Fund Balance Database Format - New.xlsx'
@@ -39,10 +40,14 @@ for label in week_labels:
     # Extract the date part from the sheet name
     try:
         date_parts = label.split(" to ")
-        week_start_date = datetime.strptime(date_parts[0].strip(), "%B %d").replace(year=datetime.now().year).date()
-        week_end_date = datetime.strptime(date_parts[1].strip(), "%B %d").replace(year=datetime.now().year).date()
+        # Parse the first part (e.g., 'March 31')
+        start_month, start_day = date_parts[0].strip().split()
+        start_date_parsed = datetime.strptime(f"{start_month} {start_day} {datetime.now().year}", "%B %d %Y").date()
+        # Parse the second part (e.g., 'April 4')
+        end_month, end_day = date_parts[1].strip().split()
+        end_date_parsed = datetime.strptime(f"{end_month} {end_day} {datetime.now().year}", "%B %d %Y").date()
         # Check if the date range falls within the selected range
-        if start_date <= week_end_date and week_start_date <= end_date:
+        if start_date <= end_date_parsed and start_date_parsed <= end_date:
             selected_weeks.append(label)
     except Exception as e:
         print(f"Error parsing week label '{label}': {e}")
