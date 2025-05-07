@@ -1,16 +1,23 @@
 import streamlit as st
 import pandas as pd
 import datetime as dt
+import matplotlib.pyplot as plt
+import seaborn as sns
+import numpy as np
+import requests
+from io import BytesIO
 
 # Set the title for the Streamlit app
 st.title('Weekly Fund Dashboard')
 
-# File Upload
-uploaded_file = st.file_uploader("Upload the Fund Balance Database Excel File", type=["xlsx"])
+# GitHub file URL (replace with your actual GitHub raw file URL)
+github_url = 'https://raw.githubusercontent.com/YourGitHubUsername/YourRepoName/main/Fund%20Balance%20Database%20Format%20-%20New.xlsx'
 
-if uploaded_file:
-    # Load the Excel file and list available sheets (weeks)
-    excel_file = pd.ExcelFile(uploaded_file)
+# Attempt to load the Excel file from GitHub
+try:
+    response = requests.get(github_url)
+    response.raise_for_status()
+    excel_file = pd.ExcelFile(BytesIO(response.content))
     weeks = excel_file.sheet_names
 
     # Sidebar for selecting the week and filtering currencies
@@ -18,7 +25,7 @@ if uploaded_file:
 
     # Week selection
     selected_week = st.sidebar.selectbox(
-        'Select Week', weeks, index=len(weeks) - 1
+        'Select Week', weeks, index=len(weeks)-1
     )
 
     # Extracting date range from the selected sheet name
@@ -36,11 +43,35 @@ if uploaded_file:
     selected_currencies = st.sidebar.multiselect('Select Currencies', currencies, default=currencies)
 
     # Load the selected week's data
-    df = pd.read_excel(uploaded_file, sheet_name=selected_week)
+    df = pd.read_excel(BytesIO(response.content), sheet_name=selected_week)
 
-    # Display the data
+    # Extracting relevant sections
+    opening_balances = df[df['Details'].str.contains('Bank & Cash Balances', case=False, na=False)]
+    cash_ins = df[df['Details'].str.contains('Cash Ins', case=False, na=False)]
+    cash_outs = df[df['Details'].str.contains('Cash Outs', case=False, na=False)]
+
+    # Weekly Summary
     st.subheader(f'Weekly Summary: {selected_week}')
-    st.dataframe(df)
+
+    # Opening Balances (Dropdown)
+    with st.expander('Opening Balances'):
+        st.dataframe(opening_balances)
+
+    # Cash Ins (Dropdown)
+    with st.expander('Cash Ins'):
+        st.dataframe(cash_ins)
+        cash_in_total = cash_ins[selected_currencies].sum()
+        st.write('Total Cash Ins:', cash_in_total)
+
+    # Cash Outs (Dropdown)
+    with st.expander('Cash Outs'):
+        st.dataframe(cash_outs)
+        cash_out_total = cash_outs[selected_currencies].sum()
+        st.write('Total Cash Outs:', cash_out_total)
+
+    # Full Dataset
+    with st.expander('Full Dataset'):
+        st.dataframe(df)
 
     # Download full dataset
     csv_file = df.to_csv(index=False).encode('utf-8')
@@ -50,3 +81,38 @@ if uploaded_file:
         file_name=f'{selected_week}_full_data.csv',
         mime='text/csv'
     )
+
+    # Charts and Graphs
+    with st.expander('Charts and Graphs'):
+        fig, ax = plt.subplots(figsize=(14, 8))
+        cash_ins_plot = cash_ins[selected_currencies].sum()
+        sns.barplot(x=cash_ins_plot.index, y=cash_ins_plot.values, ax=ax)
+        ax.set_title('Cash Ins Overview')
+        ax.set_xlabel('Currency')
+        ax.set_ylabel('Total Value')
+        st.pyplot(fig)
+
+        fig, ax = plt.subplots(figsize=(14, 8))
+        cash_outs_plot = cash_outs[selected_currencies].sum()
+        sns.barplot(x=cash_outs_plot.index, y=cash_outs_plot.values, ax=ax)
+        ax.set_title('Cash Outs Overview')
+        ax.set_xlabel('Currency')
+        ax.set_ylabel('Total Value')
+        st.pyplot(fig)
+
+    # Weekly Total Comparison
+    with st.expander('Weekly Total Comparison'):
+        weekly_totals = pd.DataFrame({
+            'Cash Ins': cash_ins[selected_currencies].sum(),
+            'Cash Outs': cash_outs[selected_currencies].sum()
+        })
+        weekly_totals.plot(kind='bar', figsize=(14, 8))
+        plt.title('Weekly Cash In vs Cash Out Comparison')
+        plt.xlabel('Currency')
+        plt.ylabel('Total Value')
+        st.pyplot(plt)
+
+except requests.exceptions.RequestException as e:
+    st.error(f'Error loading the Excel file from GitHub: {e}')
+except Exception as e:
+    st.error(f'An unexpected error occurred: {e}')
