@@ -4,19 +4,27 @@ import datetime as dt
 import glob
 import os
 
-# 1. Load and clean all weekly Excel files from the "data" folder
+# 1. Load and clean all weekly Excel files from the "data" folder or '/mnt/data'
 @st.cache_data
 def load_fund_data():
-    files = glob.glob('data/Fund_Balance_*.xlsx')
+    # Search both project 'data' folder and Streamlit's /mnt/data mount
+    paths = glob.glob('data/Fund_Balance_*.xlsx') + glob.glob('/mnt/data/Fund_Balance_*.xlsx')
     all_weeks = []
-    for file in files:
+    for file in paths:
         # Derive week label from filename, e.g. "March_31_to_April_4"
         base = os.path.basename(file).replace('Fund_Balance_','').replace('.xlsx','')
         week_label = base
-        df = pd.read_excel(file)
+        try:
+            df = pd.read_excel(file)
+        except Exception as e:
+            st.warning(f"Could not read {file}: {e}")
+            continue
         # Identify section header rows
         mask = df['Details'].str.contains('Bank & Cash Balances|Cash Transactions During the Week|Cash Ins|Cash Outs', na=False)
         idx = df[mask].index.tolist()
+        if not idx:
+            st.warning(f"No valid sections found in {file}")
+            continue
         parts = []
         for i, start in enumerate(idx):
             end = idx[i+1] if i+1 < len(idx) else len(df)
@@ -27,10 +35,15 @@ def load_fund_data():
         week_df = pd.concat(parts, ignore_index=True)
         week_df['Week'] = week_label
         all_weeks.append(week_df)
+    if not all_weeks:
+        return pd.DataFrame()
     combined = pd.concat(all_weeks, ignore_index=True)
     return combined
 
 fund_data = load_fund_data()
+if fund_data.empty:
+    st.error("No weekly fund data found. Please upload Excel files matching 'Fund_Balance_*.xlsx' to the 'data' folder or '/mnt/data'.")
+    st.stop()
 
 # 2. Sidebar: Settings and Filters
 st.sidebar.title('Weekly Fund Dashboard Settings')
@@ -39,11 +52,14 @@ st.sidebar.title('Weekly Fund Dashboard Settings')
 weeks = sorted(fund_data['Week'].unique())
 selected_week = st.sidebar.selectbox('1. Select Week', weeks)
 # Parse start and end dates for validation and display
-start_str, end_str = selected_week.split('_to_')
-start_dt = dt.datetime.strptime(start_str, '%B_%d').replace(year=2025)
-end_dt = dt.datetime.strptime(end_str, '%B_%d').replace(year=2025)
-today = dt.date.today()
-if end_dt.date() > today:
+try:
+    start_str, end_str = selected_week.split('_to_')
+    start_dt = dt.datetime.strptime(start_str, '%B_%d').replace(year=dt.date.today().year)
+    end_dt = dt.datetime.strptime(end_str, '%B_%d').replace(year=dt.date.today().year)
+except Exception:
+    start_dt, end_dt = None, None
+
+if end_dt and end_dt.date() > dt.date.today():
     st.sidebar.error('⚠️ Selected week contains future dates! Please choose a past week.')
 
 # B. Currency filter
@@ -62,7 +78,10 @@ st.sidebar.info('Note: Historical fund values used the exchange rates of that pe
 
 # 3. Main Dashboard Header
 st.title('📊 Weekly Fund Dashboard')
-st.subheader(f'Data for {selected_week.replace("_", " ")} ({start_dt.date()} to {end_dt.date()})')
+subtitle = f'Data for {selected_week.replace("_", " ")}'
+if start_dt and end_dt:
+    subtitle += f' ({start_dt.date()} to {end_dt.date()})'
+st.subheader(subtitle)
 
 # Filter fund_data for selected week
 week_df = fund_data[fund_data['Week'] == selected_week]
@@ -76,7 +95,7 @@ mapping = {
     'Cash Ins': 'Cash Ins',
     'Cash Outs': 'Cash Outs'
 }
-sec_name = mapping[summary_option]
+sec_name = mapping.get(summary_option)
 summary_df = week_df[week_df['Section'].str.contains(sec_name, na=False)]
 
 with st.expander(f'{summary_option} Details'):
@@ -93,7 +112,9 @@ st.header('📂 Detailed Breakdown')
 for section in ['Bank & Cash Balances', 'Cash Ins', 'Cash Outs']:
     sec_df = week_df[week_df['Section'].str.contains(section, na=False)]
     with st.expander(section):
-        st.table(sec_df[['Details', selected_currency, 'Total in LKR', 'Total in USD']].rename(columns={'Details':'Category', selected_currency:selected_currency}))
+        display_df = sec_df[['Details', selected_currency, 'Total in LKR', 'Total in USD']].copy()
+        display_df.rename(columns={'Details':'Category'}, inplace=True)
+        st.table(display_df)
 
 # 6. Charts & Graphs
 st.header('📈 Charts & Graphs')
