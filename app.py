@@ -76,7 +76,8 @@ mapping = {
     'Cash Ins': 'Cash Ins',
     'Cash Outs': 'Cash Outs'
 }
-sec_name = mapping[summary_option]\nsummary_df = week_df[week_df['Section'].str.contains(sec_name, na=False)]
+sec_name = mapping[summary_option]
+summary_df = week_df[week_df['Section'].str.contains(sec_name, na=False)]
 
 with st.expander(f'{summary_option} Details'):
     st.write(summary_df[['Details', selected_currency, 'Total in LKR', 'Total in USD']])
@@ -97,10 +98,10 @@ for section in ['Bank & Cash Balances', 'Cash Ins', 'Cash Outs']:
 # 6. Charts & Graphs
 st.header('📈 Charts & Graphs')
 # A. Weekly Cash Ins trend
-ins_trend = fund_data[fund_data['Section']=='Cash Ins'].groupby('Week')[selected_currency].sum()
+ins_trend = fund_data[fund_data['Section'] == 'Cash Ins'].groupby('Week')[selected_currency].sum()
 st.line_chart(ins_trend.rename('Cash Ins'))
 # B. Weekly Cash Outs trend
-outs_trend = fund_data[fund_data['Section']=='Cash Outs'].groupby('Week')[selected_currency].sum()
+outs_trend = fund_data[fund_data['Section'] == 'Cash Outs'].groupby('Week')[selected_currency].sum()
 st.line_chart(outs_trend.rename('Cash Outs'))
 # C. Comparison Bar Chart for selected week
 chart_df = week_df.groupby('Section')[selected_currency].sum().reset_index()
