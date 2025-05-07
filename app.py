@@ -208,12 +208,48 @@ if mode == 'Rolling Window':
     pr_sum.columns = ['Category'] + [f'Total {cur}' for cur in selected_currencies]
     st.write(pr_sum)
 
-# 12. Full Dataset
+# 12. Forecasting & Trends
+st.header('🔮 Forecasting & Trends')
+# A. Moving Averages on Weekly Comparison
+st.subheader('Moving Averages on Weekly Comparison')
+if comp_weeks:
+    comp_df = fund_data[fund_data['Week'].isin(comp_weeks)]
+    comp_summary = comp_df.groupby('Week')[selected_currencies].sum()
+    for cur in selected_currencies:
+        series = comp_summary[cur]
+        # 3-week moving average
+        ma = series.rolling(window=3, min_periods=1).mean()
+        df_plot = pd.DataFrame({
+            'Actual': series,
+            'Moving Average (3wk)': ma
+        })
+        st.line_chart(df_plot)
+else:
+    st.info('Select weeks above to show moving averages.')
+
+# B. ARIMA Forecast for Closing Balance
+st.subheader('ARIMA Forecast for Closing Balance')
+from statsmodels.tsa.arima.model import ARIMA
+for cur in selected_currencies:
+    # Prepare closing balance series for all weeks
+    open_vals = fund_data[fund_data['Section']=='Bank & Cash Balances'].groupby('Week')[cur].sum()
+    ins_vals = fund_data[fund_data['Section']=='Cash Ins'].groupby('Week')[cur].sum()
+    outs_vals = fund_data[fund_data['Section']=='Cash Outs'].groupby('Week')[cur].sum()
+    net_vals = ins_vals.sub(outs_vals, fill_value=0)
+    close_vals = open_vals.add(net_vals, fill_value=0)
+    try:
+        model = ARIMA(close_vals, order=(1,1,0))
+        res = model.fit()
+        fcast = res.forecast(steps=1)
+        st.write(f'Forecast next week closing balance in {cur}: {fcast.iloc[0]:.2f} {cur}')
+    except Exception as e:
+        st.warning(f'Could not forecast for {cur}: {e}')
+
+# 13. Full Dataset
 st.header('📁 Full Dataset')
 with st.expander('View Full Dataset'):
     st.dataframe(fund_data)
     st.download_button('Download Full Dataset', fund_data.to_csv(index=False), file_name='Full_Weekly_Fund_Data.csv', mime='text/csv')
 
-# Footer
 st.write('---')
 st.caption('Created with ❤️ using Streamlit & GitHub')
